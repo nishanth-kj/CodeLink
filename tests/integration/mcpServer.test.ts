@@ -122,6 +122,26 @@ describe("MCP server end-to-end (real codelink-core, real MCP client)", () => {
     await client.close();
   });
 
+  it("lists and reads every registered resource", async () => {
+    const client = await connectClient(harness.address);
+    const { resources } = await client.listResources();
+    const uris = resources.map((resource) => resource.uri);
+    expect(uris).toEqual(
+      expect.arrayContaining(["workspace://info", "workspace://files", "editor://active", "diagnostics://workspace"]),
+    );
+
+    for (const uri of uris) {
+      const result = await client.readResource({ uri });
+      const first = result.contents[0];
+      // Every resource returns JSON text (never a binary blob); this just
+      // proves resources/read actually invoked the handler rather than
+      // returning nothing.
+      expect(first && "text" in first).toBe(true);
+      expect(() => JSON.parse((first as { text: string }).text)).not.toThrow();
+    }
+    await client.close();
+  });
+
   it("writes and reads a file through the real Rust core", async () => {
     const client = await connectClient(harness.address);
     const writeResult = await client.callTool({ name: "file_write", arguments: { path: "hello.txt", content: "hi there" } });

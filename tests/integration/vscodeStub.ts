@@ -4,17 +4,21 @@
  * files, mcp/server.ts by extension) can be loaded outside the real VS
  * Code extension host, where no such module exists on disk.
  *
- * This suite never exercises a code path that actually calls into these
- * objects — it only calls tools that talk to codelink-core directly
- * (filesystem, terminal, git). Coverage for the VS Code-API-backed tools
- * (editor, diagnostics, symbol search) lives in extension/test, which runs
- * inside a real extension host via @vscode/test-electron. If a future
- * integration test needs a real vscode.* call to succeed, extend this
- * stub rather than reaching for the real API here.
+ * This suite mostly exercises tools that talk to codelink-core directly
+ * (filesystem, terminal, git) rather than real VS Code state — coverage
+ * for the VS Code-API-backed tools (editor, diagnostics, symbol search)
+ * lives in extension/test, which runs inside a real extension host via
+ * @vscode/test-electron. The one exception is the four MCP resources
+ * (workspace://info, workspace://files, editor://active,
+ * diagnostics://workspace), which this suite does read end to end to
+ * verify resources/list and resources/read work — each degrades to an
+ * empty/"nothing active" shape against this stub rather than throwing,
+ * which is enough to prove the MCP resource-serving plumbing itself
+ * works without needing a real editor or diagnostics to be present.
  */
 export const window = {};
 export const workspace = {};
-export const languages = {};
+export const languages = { getDiagnostics: () => [] };
 export const commands = {};
 export const env = {};
 export const Uri = {};
