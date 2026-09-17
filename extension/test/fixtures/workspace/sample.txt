@@ -1,0 +1,1 @@
+This is a fixture file used by CodeLink's extension-host test suite.
