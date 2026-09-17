@@ -38,6 +38,8 @@ export class RustBridge {
   private readonly notificationHandlers = new Set<NotificationHandler>();
   private readonly logger: Logger;
 
+  private expectingExit = false;
+
   constructor(private readonly options: RustBridgeOptions) {
     this.logger = options.logger.child("rust-bridge");
   }
@@ -60,8 +62,13 @@ export class RustBridge {
     proc.on("stderr", (line) => this.logger.debug(`core: ${line}`));
     proc.on("error", (error) => this.logger.error("codelink-core transport error", { message: error.message }));
     proc.on("exit", (code, signal) => {
-      this.logger.warn("codelink-core exited", { code, signal });
       this.process = undefined;
+      if (this.expectingExit) {
+        this.logger.info("codelink-core stopped", { code, signal });
+        this.expectingExit = false;
+        return;
+      }
+      this.logger.warn("codelink-core exited unexpectedly", { code, signal });
       this.rejectAllPending(new CodeLinkError(ErrorCodes.RUST_CORE_CRASHED, "codelink-core process exited unexpectedly"));
     });
 
@@ -70,14 +77,18 @@ export class RustBridge {
     this.logger.info("codelink-core started", { binaryPath });
   }
 
-  stop(): void {
-    this.process?.stop();
-    this.process = undefined;
+  async stop(): Promise<void> {
+    const process = this.process;
+    if (!process) {
+      return;
+    }
+    this.expectingExit = true;
+    await process.stop();
     this.rejectAllPending(new CodeLinkError(ErrorCodes.SERVER_NOT_RUNNING, "codelink-core was stopped"));
   }
 
-  restart(): void {
-    this.stop();
+  async restart(): Promise<void> {
+    await this.stop();
     this.start();
   }
 

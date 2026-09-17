@@ -3,7 +3,7 @@ import { showError, showInfo } from "../ui/notifications.js";
 
 export async function restartServer(ctx: AppContext): Promise<void> {
   try {
-    ctx.bridge.restart();
+    await ctx.bridge.restart();
     const { host, port } = await ctx.mcpServer.restart();
     ctx.statusBar.setState(ctx.getConfig().remote.enabled ? "remote" : "running", `http://${host}:${port}/mcp`);
     showInfo("CodeLink MCP server restarted.");

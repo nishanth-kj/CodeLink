@@ -4,7 +4,7 @@ import { showError, showInfo } from "../ui/notifications.js";
 export async function stopServer(ctx: AppContext): Promise<void> {
   try {
     await ctx.mcpServer.stop();
-    ctx.bridge.stop();
+    await ctx.bridge.stop();
     ctx.tunnel.stop();
     ctx.statusBar.setState("stopped");
     showInfo("CodeLink MCP server stopped.");

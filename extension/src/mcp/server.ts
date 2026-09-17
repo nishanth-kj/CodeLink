@@ -1,6 +1,7 @@
+import { randomUUID } from "node:crypto";
 import * as http from "node:http";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { effectiveHost } from "../config/defaults.js";
 import type { CodeLinkConfig } from "../config/schema.js";
 import { diagnosticsWorkspaceResource } from "../resources/diagnostics.js";
@@ -22,7 +23,6 @@ import type { Logger } from "../utils/logger.js";
 import { buildServerInfo, SERVER_INSTRUCTIONS } from "./capabilities.js";
 import { extractBearerToken, httpStatusForErrorCode, isHostHeaderAllowed, MCP_ENDPOINT_PATH } from "./protocol.js";
 import { SessionTracker } from "./session.js";
-import { createTransport } from "./transport.js";
 
 const ALL_TOOLS: RegisteredTool[] = [
   ...workspaceTools,
@@ -56,6 +56,11 @@ export interface McpServerAddress {
   port: number;
 }
 
+interface McpSession {
+  server: McpServer;
+  transport: StreamableHTTPServerTransport;
+}
+
 /**
  * Owns the MCP server's HTTP listener end to end: binding (never beyond
  * 127.0.0.1 unless remote access is enabled, regardless of configuration),
@@ -63,11 +68,19 @@ export interface McpServerAddress {
  * before any MCP routing, and registering every tool/resource behind the
  * tool-scoped permission check. See docs/mcp.md for the full pipeline this
  * class and `tools/index.ts` together implement.
+ *
+ * `StreamableHTTPServerTransport` is single-session: one transport can
+ * only ever complete one `initialize` handshake. A client reconnecting
+ * (or a second client connecting at all) needs its own transport and its
+ * own `McpServer`, so this class keeps a `Map` of sessions keyed by the
+ * `Mcp-Session-Id` the transport assigns on `initialize`, and every HTTP
+ * request is routed to the right session by that header — the standard
+ * pattern for a stateful, multi-session Streamable HTTP server.
  */
 export class McpServerManager {
   private httpServer: http.Server | undefined;
-  private mcpServer: McpServer | undefined;
-  private transport: StreamableHTTPServerTransport | undefined;
+  private ctx: ToolContext | undefined;
+  private readonly sessions = new Map<string, McpSession>();
   private readonly sessionTracker = new SessionTracker();
   private readonly logger: Logger;
 
@@ -79,7 +92,7 @@ export class McpServerManager {
     return this.httpServer !== undefined;
   }
 
-  get sessions(): SessionTracker {
+  get sessionInfo(): SessionTracker {
     return this.sessionTracker;
   }
 
@@ -92,7 +105,7 @@ export class McpServerManager {
     const host = effectiveHost(config);
     const port = config.server.port;
 
-    const ctx: ToolContext = {
+    this.ctx = {
       workspaceRoot: this.options.workspaceRoot,
       workspaceName: this.options.workspaceName,
       bridge: this.options.bridge,
@@ -100,38 +113,8 @@ export class McpServerManager {
       logger: this.logger,
     };
 
-    const mcpServer = new McpServer(buildServerInfo(this.options.extensionVersion), {
-      instructions: SERVER_INSTRUCTIONS,
-    });
-
-    for (const tool of ALL_TOOLS) {
-      mcpServer.registerTool(
-        tool.name,
-        { description: tool.description, inputSchema: tool.inputSchema },
-        bindTool(tool, ctx, this.options.policy),
-      );
-    }
-
-    for (const resource of ALL_RESOURCES) {
-      mcpServer.registerResource(
-        resource.name,
-        resource.uri,
-        { description: resource.description, mimeType: resource.mimeType },
-        async (uri) => {
-          if (resource.permission) {
-            this.options.policy.checkPermission(resource.permission);
-          }
-          const text = await resource.read(ctx);
-          return { contents: [{ uri: uri.toString(), mimeType: resource.mimeType, text }] };
-        },
-      );
-    }
-
-    const transport = createTransport(this.sessionTracker);
-    await mcpServer.connect(transport);
-
     const httpServer = http.createServer((req, res) => {
-      this.handleRequest(req, res, transport).catch((error: unknown) => {
+      this.handleRequest(req, res).catch((error: unknown) => {
         this.logger.error("Unhandled error while handling MCP request", {
           message: error instanceof Error ? error.message : String(error),
         });
@@ -145,8 +128,6 @@ export class McpServerManager {
     await this.listen(httpServer, host, port);
 
     this.httpServer = httpServer;
-    this.mcpServer = mcpServer;
-    this.transport = transport;
     this.logger.info("MCP server started", { host, port, remoteEnabled: config.remote.enabled });
     return { host, port };
   }
@@ -177,12 +158,24 @@ export class McpServerManager {
       return;
     }
     this.httpServer = undefined;
-    await new Promise<void>((resolve) => httpServer.close(() => resolve()));
-    await this.transport?.close();
-    await this.mcpServer?.close();
-    this.mcpServer = undefined;
-    this.transport = undefined;
+
+    // Close sessions (ending any open SSE stream) before closing the HTTP
+    // server: node's http.Server#close() callback only fires once every
+    // connection has ended on its own, so closing the server first would
+    // deadlock against a still-open streaming response.
+    for (const session of this.sessions.values()) {
+      await session.transport.close();
+      await session.server.close();
+    }
+    this.sessions.clear();
     this.sessionTracker.reset();
+
+    await new Promise<void>((resolve) => {
+      httpServer.close(() => resolve());
+      httpServer.closeAllConnections();
+    });
+
+    this.ctx = undefined;
     this.logger.info("MCP server stopped");
   }
 
@@ -191,11 +184,52 @@ export class McpServerManager {
     return this.start();
   }
 
-  private async handleRequest(
-    req: http.IncomingMessage,
-    res: http.ServerResponse,
-    transport: StreamableHTTPServerTransport,
-  ): Promise<void> {
+  /** Builds one session's McpServer + transport, with every tool and
+   * resource registered exactly as `start()` used to do once globally. */
+  private createSession(ctx: ToolContext): McpSession {
+    const mcpServer = new McpServer(buildServerInfo(this.options.extensionVersion), {
+      instructions: SERVER_INSTRUCTIONS,
+    });
+
+    for (const tool of ALL_TOOLS) {
+      mcpServer.registerTool(
+        tool.name,
+        { description: tool.description, inputSchema: tool.inputSchema },
+        bindTool(tool, ctx, this.options.policy),
+      );
+    }
+
+    for (const resource of ALL_RESOURCES) {
+      mcpServer.registerResource(
+        resource.name,
+        resource.uri,
+        { description: resource.description, mimeType: resource.mimeType },
+        async (uri) => {
+          if (resource.permission) {
+            this.options.policy.checkPermission(resource.permission);
+          }
+          const text = await resource.read(ctx);
+          return { contents: [{ uri: uri.toString(), mimeType: resource.mimeType, text }] };
+        },
+      );
+    }
+
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: () => randomUUID(),
+      onsessioninitialized: (sessionId) => {
+        this.sessions.set(sessionId, { server: mcpServer, transport });
+        this.sessionTracker.onInitialized(sessionId);
+      },
+      onsessionclosed: (sessionId) => {
+        this.sessions.delete(sessionId);
+        this.sessionTracker.onClosed(sessionId);
+      },
+    });
+
+    return { server: mcpServer, transport };
+  }
+
+  private async handleRequest(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
     const config = this.options.getConfig();
     const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
 
@@ -225,6 +259,25 @@ export class McpServerManager {
       return;
     }
 
-    await transport.handleRequest(req, res);
+    const sessionIdHeader = req.headers["mcp-session-id"];
+    const sessionId = Array.isArray(sessionIdHeader) ? sessionIdHeader[0] : sessionIdHeader;
+
+    let session = sessionId ? this.sessions.get(sessionId) : undefined;
+    if (!session) {
+      if (sessionId) {
+        res.writeHead(404, { "content-type": "application/json" });
+        res.end(JSON.stringify({ error: { code: "SESSION_NOT_FOUND", message: "Unknown or expired MCP session." } }));
+        return;
+      }
+      if (!this.ctx) {
+        res.writeHead(503, { "content-type": "application/json" });
+        res.end(JSON.stringify({ error: { code: ErrorCodes.SERVER_NOT_RUNNING, message: "Server is not ready." } }));
+        return;
+      }
+      session = this.createSession(this.ctx);
+      await session.server.connect(session.transport);
+    }
+
+    await session.transport.handleRequest(req, res);
   }
 }

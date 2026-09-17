@@ -156,7 +156,7 @@ export async function deactivate(): Promise<void> {
   }
   appContext.tunnel.stop();
   await appContext.mcpServer.stop();
-  appContext.bridge.stop();
+  await appContext.bridge.stop();
   appContext = undefined;
 }
 

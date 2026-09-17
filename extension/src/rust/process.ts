@@ -83,7 +83,18 @@ export class CoreProcess extends EventEmitter {
     return this.child !== undefined;
   }
 
-  stop(): void {
-    this.child?.kill();
+  /** Resolves once the child has actually exited (not merely once `kill()`
+   * has been called): on Windows in particular, deleting or reusing a
+   * workspace directory the child had open can race with the OS actually
+   * releasing its handles if the caller doesn't wait for the real exit. */
+  stop(): Promise<void> {
+    const child = this.child;
+    if (!child) {
+      return Promise.resolve();
+    }
+    return new Promise<void>((resolve) => {
+      child.once("exit", () => resolve());
+      child.kill();
+    });
   }
 }
