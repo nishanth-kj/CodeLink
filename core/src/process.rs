@@ -42,6 +42,38 @@ fn now_ms() -> u128 {
         .unwrap_or(0)
 }
 
+/// Substrings that mark an environment variable as likely to hold a
+/// credential. Matched case-insensitively against the variable name (not
+/// its value): this is a name-based allowlist-by-exclusion, not a secret
+/// scanner, and callers may still pass a sensitive value explicitly via
+/// `params.env` if they really mean to.
+const SENSITIVE_ENV_SUBSTRINGS: [&str; 6] = [
+    "API_KEY",
+    "TOKEN",
+    "PASSWORD",
+    "SECRET",
+    "PRIVATE_KEY",
+    "CREDENTIAL",
+];
+
+fn is_sensitive_env_key(key: &str) -> bool {
+    let upper = key.to_uppercase();
+    upper.starts_with("AWS_")
+        || SENSITIVE_ENV_SUBSTRINGS
+            .iter()
+            .any(|needle| upper.contains(needle))
+}
+
+/// A spawned process must still be able to resolve `PATH` (or it can't find
+/// `git`, `npm`, etc. by name), so `spawn()` does not simply clear the
+/// environment; it starts from codelink-core's own inherited environment
+/// (itself inherited from the VS Code extension host) and drops anything
+/// that looks like a credential, matching the default terminal/process
+/// security posture described in docs/security.md.
+fn filtered_inherited_env() -> impl Iterator<Item = (String, String)> {
+    std::env::vars().filter(|(key, _)| !is_sensitive_env_key(key))
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct SpawnParams {
@@ -81,6 +113,7 @@ pub fn spawn(params: Value) -> CoreResult<Value> {
         .args(&p.args)
         .current_dir(&cwd_resolved)
         .env_clear()
+        .envs(filtered_inherited_env())
         .envs(&p.env)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -281,4 +314,76 @@ pub fn list(_params: Value) -> CoreResult<Value> {
         })
         .collect();
     Ok(json!({ "processes": processes }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{Duration, Instant};
+
+    #[test]
+    fn detects_sensitive_env_keys() {
+        assert!(is_sensitive_env_key("OPENAI_API_KEY"));
+        assert!(is_sensitive_env_key("GITHUB_TOKEN"));
+        assert!(is_sensitive_env_key("AWS_SECRET_ACCESS_KEY"));
+        assert!(is_sensitive_env_key("aws_access_key_id"));
+        assert!(is_sensitive_env_key("DB_PASSWORD"));
+        assert!(!is_sensitive_env_key("PATH"));
+        assert!(!is_sensitive_env_key("HOME"));
+        assert!(!is_sensitive_env_key("LANG"));
+    }
+
+    fn wait_for_exit(id: &str, timeout: Duration) -> Value {
+        let deadline = Instant::now() + timeout;
+        loop {
+            let result = output(json!({ "id": id })).unwrap();
+            if result["status"] != "running" || Instant::now() >= deadline {
+                return result;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+    }
+
+    #[test]
+    fn spawned_process_inherits_path_but_not_sensitive_vars() {
+        // SAFETY: this test does not run concurrently with other tests that
+        // read/write the process environment (cargo test runs each test in
+        // its own thread, but nothing else in this crate touches env vars).
+        unsafe {
+            std::env::set_var("CODELINK_TEST_SECRET_TOKEN", "should-not-appear");
+        }
+
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().to_string_lossy().to_string();
+        let (command, args) = if cfg!(windows) {
+            ("cmd".to_string(), vec!["/C".to_string(), "set".to_string()])
+        } else {
+            ("env".to_string(), Vec::<String>::new())
+        };
+
+        let spawn_result =
+            spawn(json!({ "root": root, "command": command, "args": args })).unwrap();
+        let id = spawn_result["id"].as_str().unwrap().to_string();
+        let result = wait_for_exit(&id, Duration::from_secs(5));
+
+        let stdout = result["stdout"].as_str().unwrap_or("");
+        assert!(
+            !stdout.contains("CODELINK_TEST_SECRET_TOKEN"),
+            "sensitive var leaked into child env: {stdout}"
+        );
+        assert!(
+            result["status"] == "exited",
+            "expected process to exit, got {result:?}"
+        );
+
+        unsafe {
+            std::env::remove_var("CODELINK_TEST_SECRET_TOKEN");
+        }
+    }
+
+    #[test]
+    fn output_reports_unknown_process() {
+        let err = output(json!({ "id": "does-not-exist" })).unwrap_err();
+        assert_eq!(err.code, "PROCESS_NOT_FOUND");
+    }
 }
