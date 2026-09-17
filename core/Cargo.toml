@@ -1,6 +1,6 @@
 [package]
 name = "codelink-core"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 description = "CodeLink native system layer: filesystem, process, search, and Git operations over a JSON IPC protocol."
 license = "MIT"
