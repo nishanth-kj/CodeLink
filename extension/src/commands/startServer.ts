@@ -8,6 +8,7 @@ export async function startServer(ctx: AppContext): Promise<void> {
     }
     const { host, port } = await ctx.mcpServer.start();
     ctx.statusBar.setState(ctx.getConfig().remote.enabled ? "remote" : "running", `http://${host}:${port}/mcp`);
+    ctx.sidebar?.refresh();
     showInfo(`CodeLink is running at http://${host}:${port}/mcp`);
   } catch (error) {
     showError(`Failed to start CodeLink: ${error instanceof Error ? error.message : String(error)}`);

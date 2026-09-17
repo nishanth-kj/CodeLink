@@ -1,3 +1,5 @@
+import * as fs from "node:fs";
+import * as path from "node:path";
 import type { CodeLinkConfig } from "../config/schema.js";
 import { CodeLinkError, ErrorCodes } from "../utils/errors.js";
 import type { Logger } from "../utils/logger.js";
@@ -5,31 +7,33 @@ import { CloudflareTunnel } from "./cloudflare.js";
 
 const TUNNEL_URL_TIMEOUT_MS = 20_000;
 
-function resolveCloudflaredPath(configuredPath: string): string {
+function resolveCloudflaredPath(configuredPath: string, extensionRoot?: string): string {
   if (configuredPath.trim().length > 0) {
     return configuredPath;
   }
-  return process.platform === "win32" ? "cloudflared.exe" : "cloudflared";
+  const binaryName = process.platform === "win32" ? "cloudflared.exe" : "cloudflared";
+  if (extensionRoot) {
+    const candidate = path.join(extensionRoot, "bin", `${process.platform}-${process.arch}`, binaryName);
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return binaryName;
 }
 
-/**
- * The tunnel is never started automatically and never bypasses CodeLink's
- * own authentication: `start()` refuses unless `codelink.remote.enabled`
- * is already true, so a user cannot accidentally expose the server to the
- * internet by starting a tunnel alone (see docs/remote-access.md — the
- * tunnel makes the server *reachable*, it does not make it *secure* on its
- * own).
- */
 export class TunnelManager {
   private tunnel: CloudflareTunnel | undefined;
   private url: string | undefined;
   private readonly logger: Logger;
+  private readonly extensionRoot?: string;
 
   constructor(
     private readonly getConfig: () => CodeLinkConfig,
     logger: Logger,
+    extensionRoot?: string,
   ) {
     this.logger = logger.child("tunnel");
+    this.extensionRoot = extensionRoot;
   }
 
   isRunning(): boolean {
@@ -42,17 +46,11 @@ export class TunnelManager {
 
   start(localPort: number): Promise<string> {
     const config = this.getConfig();
-    if (!config.remote.enabled) {
-      throw new CodeLinkError(
-        ErrorCodes.REMOTE_ACCESS_DISABLED,
-        "Enable remote access (CodeLink: Enable Remote Access) before starting a tunnel.",
-      );
-    }
     if (this.tunnel?.isRunning()) {
       throw new CodeLinkError(ErrorCodes.SERVER_START_FAILED, "The tunnel is already running.");
     }
 
-    const binaryPath = resolveCloudflaredPath(config.tunnel.cloudflaredPath);
+    const binaryPath = resolveCloudflaredPath(config.tunnel.cloudflaredPath, this.extensionRoot);
     const tunnel = new CloudflareTunnel(binaryPath, `http://127.0.0.1:${localPort}`);
     this.url = undefined;
     this.tunnel = tunnel;

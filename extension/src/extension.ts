@@ -8,6 +8,7 @@ import { revokeToken } from "./commands/revokeToken.js";
 import { showEndpoint } from "./commands/showEndpoint.js";
 import { showStatus } from "./commands/showStatus.js";
 import { showTunnelUrl } from "./commands/showTunnelUrl.js";
+import { copyTunnelUrl } from "./commands/copyTunnelUrl.js";
 import { startServer } from "./commands/startServer.js";
 import { startTunnel } from "./commands/startTunnel.js";
 import { stopServer } from "./commands/stopServer.js";
@@ -22,6 +23,7 @@ import { SecurityPolicy } from "./security/policy.js";
 import { RateLimiter } from "./security/rateLimiter.js";
 import { TunnelManager } from "./tunnel/manager.js";
 import { DashboardPanel } from "./ui/dashboard.js";
+import { SidebarViewProvider } from "./ui/sidebar.js";
 import { StatusBarController } from "./ui/statusBar.js";
 import { ConsoleSink, Logger, type LogLevel, type LogSink } from "./utils/logger.js";
 
@@ -42,6 +44,7 @@ export interface AppContext {
   policy: SecurityPolicy;
   tunnel: TunnelManager;
   statusBar: StatusBarController;
+  sidebar?: SidebarViewProvider;
   getConfig: () => CodeLinkConfig;
 }
 
@@ -83,7 +86,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     getConfig().rateLimit.maxConcurrentRequests,
   );
   const policy = new SecurityPolicy(permissions, authentication, rateLimiter, getConfig, logger);
-  const tunnel = new TunnelManager(getConfig, logger);
+  const tunnel = new TunnelManager(getConfig, logger, context.extensionPath);
   const statusBar = new StatusBarController();
   const mcpServer = new McpServerManager({
     extensionVersion: (context.extension.packageJSON as { version?: string }).version ?? "0.0.0",
@@ -112,6 +115,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   };
   appContext = ctx;
 
+  const sidebarProvider = new SidebarViewProvider(ctx);
+  ctx.sidebar = sidebarProvider;
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(SidebarViewProvider.viewType, sidebarProvider),
+  );
+
   context.subscriptions.push(statusBar);
   context.subscriptions.push(
     onConfigChanged(() => {
@@ -119,6 +128,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       logger.setLevel(config.logging.level);
       rateLimiter.updateLimits(config.rateLimit.requestsPerMinute, config.rateLimit.maxConcurrentRequests);
       DashboardPanel.refreshIfOpen(ctx);
+      sidebarProvider.refresh();
     }),
   );
 
@@ -139,6 +149,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   register("codelink.startTunnel", () => startTunnel(ctx));
   register("codelink.stopTunnel", () => stopTunnel(ctx));
   register("codelink.showTunnelUrl", () => showTunnelUrl(ctx));
+  register("codelink.copyTunnelUrl", () => copyTunnelUrl(ctx));
   register("codelink.openDashboard", () => openDashboard(ctx));
 
   await maybeShowFirstRunNotification(context);

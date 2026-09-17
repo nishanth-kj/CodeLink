@@ -15,5 +15,6 @@
   "editor.formatOnSave": true,
   "rust-analyzer.linkedProjects": [
     "core/Cargo.toml"
-  ]
+  ],
+  "codelink.remote.enabled": true
 }

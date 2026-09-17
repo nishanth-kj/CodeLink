@@ -1,5 +1,6 @@
 import * as assert from "node:assert";
 import * as vscode from "vscode";
+import "mocha";
 
 const EXPECTED_COMMANDS = [
   "codelink.startServer",
@@ -15,6 +16,7 @@ const EXPECTED_COMMANDS = [
   "codelink.startTunnel",
   "codelink.stopTunnel",
   "codelink.showTunnelUrl",
+  "codelink.copyTunnelUrl",
   "codelink.openDashboard",
 ];
 
@@ -35,7 +37,7 @@ suite("CodeLink extension (real extension host)", () => {
     assert.ok(vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0);
   });
 
-  test("start, status, and stop run against the real Rust core without throwing", async function () {
+  test("start, status, and stop run against the real Rust core without throwing", async function (this: Mocha.Context) {
     this.timeout(20000);
     await vscode.commands.executeCommand("codelink.startServer");
     await vscode.commands.executeCommand("codelink.showStatus");

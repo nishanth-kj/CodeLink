@@ -1,0 +1,116 @@
+name: Package Universal VSIX
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+    branches:
+      - main
+
+jobs:
+  build-core:
+    name: Build Rust Core (${{ matrix.platform_arch }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Windows x64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            platform_arch: win32-x64
+            binary_name: codelink-core.exe
+
+          # Windows ARM64
+          - os: windows-latest
+            target: aarch64-pc-windows-msvc
+            platform_arch: win32-arm64
+            binary_name: codelink-core.exe
+
+          # Linux x64
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            platform_arch: linux-x64
+            binary_name: codelink-core
+
+          # macOS Intel (x64)
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            platform_arch: darwin-x64
+            binary_name: codelink-core
+
+          # macOS Apple Silicon (ARM64)
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            platform_arch: darwin-arm64
+            binary_name: codelink-core
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build codelink-core
+        run: cargo build --release --manifest-path core/Cargo.toml --target ${{ matrix.target }}
+
+      - name: Prepare binary artifact
+        shell: bash
+        run: |
+          mkdir -p bin-artifact/${{ matrix.platform_arch }}
+          cp core/target/${{ matrix.target }}/release/${{ matrix.binary_name }} bin-artifact/${{ matrix.platform_arch }}/
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-${{ matrix.platform_arch }}
+          path: bin-artifact/
+
+  package-universal:
+    name: Package Universal VSIX
+    needs: build-core
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Download all core binary artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: core-*
+          path: downloaded-artifacts/
+          merge-multiple: true
+
+      - name: Assemble extension/bin directories
+        run: |
+          mkdir -p extension/bin
+          cp -r downloaded-artifacts/* extension/bin/
+          # Ensure Linux and macOS binaries are executable
+          find extension/bin -type f -not -name "*.exe" -exec chmod +x {} +
+          echo "=== Extension bin contents ==="
+          ls -laR extension/bin
+
+      - name: Install extension dependencies
+        run: npm install --prefix extension
+
+      - name: Compile extension
+        run: npm run build
+
+      - name: Package Universal VSIX
+        run: npx --prefix extension vsce package -o ../codelink-universal.vsix
+
+      - name: Upload Universal VSIX
+        uses: actions/upload-artifact@v4
+        with:
+          name: codelink-universal-vsix
+          path: codelink-universal.vsix
+          if-no-files-found: error

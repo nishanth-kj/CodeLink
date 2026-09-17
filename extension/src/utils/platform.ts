@@ -30,5 +30,13 @@ export function resolveCoreBinaryPath(extensionRoot: string): string | undefined
     path.join(extensionRoot, "..", "core", "target", "release", binaryName),
     path.join(extensionRoot, "..", "core", "target", "debug", binaryName),
   ];
-  return candidates.find((candidate) => fs.existsSync(candidate));
+  const found = candidates.find((candidate) => fs.existsSync(candidate));
+  if (found && platform !== "win32") {
+    try {
+      fs.chmodSync(found, 0o755);
+    } catch {
+      // ignore if read-only filesystem or already set
+    }
+  }
+  return found;
 }

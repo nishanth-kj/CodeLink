@@ -81,9 +81,14 @@ function renderHtml(ctx: AppContext): string {
 
   <section>
     <h2>Cloudflare Tunnel</h2>
-    <p>${tunnelRunning ? `Running: <code>${escapeHtml(ctx.tunnel.getUrl() ?? "")}</code>` : "Stopped"}</p>
-    <button data-command="startTunnel">Start Tunnel</button>
+    <p>Status: <strong>${tunnelRunning ? "Running" : "Stopped"}</strong></p>
+    ${tunnelRunning && ctx.tunnel.getUrl() ? `
+    <p>Direct Web MCP Endpoint: <code>${escapeHtml((ctx.tunnel.getUrl() ?? "").endsWith("/") ? `${ctx.tunnel.getUrl()}mcp` : `${ctx.tunnel.getUrl()}/mcp`)}</code></p>
+    <button data-command="copyTunnelUrl">Copy Tunnel URL</button>
     <button data-command="stopTunnel">Stop Tunnel</button>
+    ` : `
+    <button data-command="startTunnel">Start Tunnel &amp; Copy Link</button>
+    `}
   </section>
 
   <script>
@@ -150,6 +155,7 @@ export class DashboardPanel {
       generateToken: "codelink.generateToken",
       startTunnel: "codelink.startTunnel",
       stopTunnel: "codelink.stopTunnel",
+      copyTunnelUrl: "codelink.copyTunnelUrl",
     };
     if (command === "toggleRemote") {
       const id = this.ctx.getConfig().remote.enabled ? "codelink.disableRemoteAccess" : "codelink.enableRemoteAccess";

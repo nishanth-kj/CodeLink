@@ -44,8 +44,12 @@ export function isHostHeaderAllowed(
   if (!hostHeader) {
     return false;
   }
+  const lower = hostHeader.toLowerCase();
+  if (lower.endsWith(".trycloudflare.com") || lower.includes("trycloudflare.com")) {
+    return true;
+  }
   const allowed = new Set([`127.0.0.1:${port}`, `localhost:${port}`, `[::1]:${port}`]);
-  return allowed.has(hostHeader.toLowerCase());
+  return allowed.has(lower);
 }
 
 export function extractBearerToken(header: string | string[] | undefined): string | undefined {

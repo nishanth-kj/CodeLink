@@ -1,19 +1,24 @@
+import * as vscode from "vscode";
 import type { AppContext } from "../extension.js";
-import { showError, showInfo, showWarning } from "../ui/notifications.js";
+import { DashboardPanel } from "../ui/dashboard.js";
+import { showError, showInfo } from "../ui/notifications.js";
 
 export async function startTunnel(ctx: AppContext): Promise<void> {
   const config = ctx.getConfig();
-  if (!config.remote.enabled) {
-    showWarning("Enable remote access first: 'CodeLink: Enable Remote Access'.");
-    return;
-  }
   if (!ctx.mcpServer.isRunning()) {
-    showWarning("Start the MCP server first: 'CodeLink: Start MCP Server'.");
-    return;
+    if (!ctx.bridge.isRunning()) {
+      ctx.bridge.start();
+    }
+    await ctx.mcpServer.start();
+    ctx.statusBar.setState("running");
   }
   try {
-    const url = await ctx.tunnel.start(config.server.port);
-    showInfo(`Cloudflare tunnel established: ${url}`);
+    const rawUrl = await ctx.tunnel.start(config.server.port);
+    const mcpUrl = rawUrl.endsWith("/") ? `${rawUrl}mcp` : `${rawUrl}/mcp`;
+    await vscode.env.clipboard.writeText(mcpUrl);
+    ctx.sidebar?.refresh();
+    DashboardPanel.refreshIfOpen(ctx);
+    showInfo(`Cloudflare tunnel established! MCP URL copied to clipboard: ${mcpUrl}`);
   } catch (error) {
     showError(`Failed to start the Cloudflare tunnel: ${error instanceof Error ? error.message : String(error)}`);
   }

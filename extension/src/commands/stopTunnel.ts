@@ -3,5 +3,6 @@ import { showInfo } from "../ui/notifications.js";
 
 export function stopTunnel(ctx: AppContext): void {
   ctx.tunnel.stop();
+  ctx.sidebar?.refresh();
   showInfo("Cloudflare tunnel stopped.");
 }

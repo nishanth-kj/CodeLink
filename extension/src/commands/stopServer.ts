@@ -7,6 +7,7 @@ export async function stopServer(ctx: AppContext): Promise<void> {
     await ctx.bridge.stop();
     ctx.tunnel.stop();
     ctx.statusBar.setState("stopped");
+    ctx.sidebar?.refresh();
     showInfo("CodeLink MCP server stopped.");
   } catch (error) {
     showError(`Failed to stop CodeLink cleanly: ${error instanceof Error ? error.message : String(error)}`);

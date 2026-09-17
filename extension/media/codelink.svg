@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100%" fill="none">
+  <!-- Outer Rounded Border -->
+  <rect x="7" y="7" width="86" height="86" rx="20" stroke="currentColor" stroke-width="6.5" />
+
+  <!-- Left: VS Code Icon Silhouette -->
+  <path d="M19 46.5L38.5 29V63.5L19 46.5Z" fill="currentColor" />
+  <path d="M38.5 29L43.5 33.5V59L38.5 63.5Z" fill="currentColor" />
+  <path d="M14.5 44L21.5 37L39 52.5L34 57Z" fill="currentColor" />
+  <path d="M14.5 49L21.5 56L39 40.5L34 36Z" fill="currentColor" />
+
+  <!-- Center: Interlocking 45-degree Chain Link -->
+  <path d="M48 45.5C46 47.5 46 50.5 48 52.5C50 54.5 53 54.5 55 52.5L60.5 47C62.5 45 62.5 42 60.5 40C58.5 38 55.5 38 53.5 40L51.5 42" stroke="currentColor" stroke-width="4.5" stroke-linecap="round" />
+  <path d="M57 41.5C59 39.5 59 36.5 57 34.5C55 32.5 52 32.5 50 34.5L44.5 40C42.5 42 42.5 45 44.5 47C46.5 49 49.5 49 51.5 47L53.5 45" stroke="currentColor" stroke-width="4.5" stroke-linecap="round" />
+
+  <!-- Right: Hexagon MCP Badge -->
+  <polygon points="72,26 84,33 84,49 72,56 60,49 60,33" stroke="currentColor" stroke-width="4.2" stroke-linejoin="round" />
+  <!-- Circuit node traces -->
+  <circle cx="67.5" cy="32.5" r="2.2" stroke="currentColor" stroke-width="2.5" fill="none" />
+  <path d="M67.5 35V39" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
+  <circle cx="76.5" cy="35" r="2" stroke="currentColor" stroke-width="2.5" fill="none" />
+  <path d="M76.5 37.5V39" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
+  
+  <!-- MCP Text -->
+  <text x="72" y="44.5" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="7.5" fill="currentColor" letter-spacing="0.5">MCP</text>
+
+  <!-- Bottom Circuit nodes -->
+  <circle cx="68" cy="50.5" r="2" stroke="currentColor" stroke-width="2.5" fill="none" />
+  <path d="M68 46.5V48.5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
+  <circle cx="75.5" cy="48" r="2.2" stroke="currentColor" stroke-width="2.5" fill="none" />
+  <path d="M75.5 46.5V45.8" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
+
+  <!-- CodeLink Text -->
+  <text x="50" y="74.5" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="14.5" fill="currentColor" letter-spacing="-0.5">CodeLink</text>
+  
+  <!-- Subtitle -->
+  <text x="50" y="82.5" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="800" font-size="4.2" fill="currentColor" letter-spacing="1.4">BRIDGE CODE TO AI</text>
+</svg>
