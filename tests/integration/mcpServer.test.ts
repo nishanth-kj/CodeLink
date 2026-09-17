@@ -1,7 +1,6 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -15,8 +14,7 @@ import { SecurityPolicy } from "../../extension/src/security/policy.js";
 import { RateLimiter } from "../../extension/src/security/rateLimiter.js";
 import { ConsoleSink, Logger } from "../../extension/src/utils/logger.js";
 
-const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
-const EXTENSION_ROOT = path.resolve(TEST_DIR, "../../extension");
+const EXTENSION_ROOT = path.resolve(__dirname, "../../extension");
 
 interface Harness {
   bridge: RustBridge;
@@ -86,7 +84,16 @@ async function connectClient(address: McpServerAddress, token?: string): Promise
   return client;
 }
 
-function firstText(result: { content: unknown }): string {
+// client.callTool()'s return type is a union: the normal content-bearing
+// result, or an experimental task-style `{ toolResult }` shape we never
+// produce (none of our tools declare task execution). Accepting the
+// broader record type here (rather than narrowing the call site's type)
+// keeps every call site simple while still failing loudly, not silently,
+// if that assumption is ever wrong.
+function firstText(result: Record<string, unknown>): string {
+  if (!Array.isArray(result.content)) {
+    throw new Error(`Expected a content-bearing tool result, got: ${JSON.stringify(result)}`);
+  }
   const content = result.content as Array<{ type: string; text: string }>;
   return content[0]?.text ?? "";
 }
