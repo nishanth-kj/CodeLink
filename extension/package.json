@@ -1,0 +1,209 @@
+{
+  "name": "codelink",
+  "displayName": "CodeLink",
+  "description": "Turn your VS Code workspace into a secure local MCP server for external AI agents.",
+  "version": "0.1.0",
+  "publisher": "nishanth-kj",
+  "license": "MIT",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nishanth-kj/CodeLink"
+  },
+  "engines": {
+    "vscode": "^1.96.0",
+    "node": ">=20"
+  },
+  "categories": ["Other", "AI"],
+  "keywords": ["mcp", "model context protocol", "ai", "agent", "remote"],
+  "main": "./out/extension.js",
+  "activationEvents": ["onStartupFinished"],
+  "contributes": {
+    "commands": [
+      { "command": "codelink.startServer", "title": "Start MCP Server", "category": "CodeLink" },
+      { "command": "codelink.stopServer", "title": "Stop MCP Server", "category": "CodeLink" },
+      { "command": "codelink.restartServer", "title": "Restart MCP Server", "category": "CodeLink" },
+      { "command": "codelink.showStatus", "title": "Show Status", "category": "CodeLink" },
+      { "command": "codelink.showEndpoint", "title": "Show MCP Endpoint", "category": "CodeLink" },
+      { "command": "codelink.copyConfig", "title": "Copy MCP Configuration", "category": "CodeLink" },
+      { "command": "codelink.generateToken", "title": "Generate Access Token", "category": "CodeLink" },
+      { "command": "codelink.revokeToken", "title": "Revoke Access Token", "category": "CodeLink" },
+      { "command": "codelink.enableRemoteAccess", "title": "Enable Remote Access", "category": "CodeLink" },
+      { "command": "codelink.disableRemoteAccess", "title": "Disable Remote Access", "category": "CodeLink" },
+      { "command": "codelink.startTunnel", "title": "Start Cloudflare Tunnel", "category": "CodeLink" },
+      { "command": "codelink.stopTunnel", "title": "Stop Cloudflare Tunnel", "category": "CodeLink" },
+      { "command": "codelink.showTunnelUrl", "title": "Show Tunnel URL", "category": "CodeLink" },
+      { "command": "codelink.openDashboard", "title": "Open Dashboard", "category": "CodeLink" }
+    ],
+    "configuration": {
+      "title": "CodeLink",
+      "properties": {
+        "codelink.server.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Start the CodeLink MCP server automatically when the workspace opens. The server is stopped by default and must be started explicitly."
+        },
+        "codelink.server.host": {
+          "type": "string",
+          "default": "127.0.0.1",
+          "description": "Network interface the MCP server binds to. Must remain 127.0.0.1 unless remote access is explicitly enabled."
+        },
+        "codelink.server.port": {
+          "type": "integer",
+          "default": 32100,
+          "minimum": 1,
+          "maximum": 65535,
+          "description": "TCP port the MCP server listens on."
+        },
+        "codelink.server.transport": {
+          "type": "string",
+          "enum": ["streamable-http"],
+          "default": "streamable-http",
+          "description": "MCP network transport. Only Streamable HTTP is currently supported."
+        },
+        "codelink.security.profile": {
+          "type": "string",
+          "enum": ["readonly", "developer", "trusted", "custom"],
+          "enumDescriptions": [
+            "Read-only access: workspace, search, editor read, diagnostics, git read.",
+            "Adds editor write and file write on top of readonly (default).",
+            "Adds file delete, terminal, and git write. Requires explicit confirmation to activate.",
+            "Use the individual codelink.security.allow* settings instead of a preset."
+          ],
+          "default": "developer",
+          "description": "Security profile controlling which tool permissions are granted."
+        },
+        "codelink.security.allowFileWrite": {
+          "type": "boolean",
+          "default": true,
+          "description": "Only used when codelink.security.profile is \"custom\". Allow tools to write files in the workspace."
+        },
+        "codelink.security.allowFileDelete": {
+          "type": "boolean",
+          "default": false,
+          "description": "Only used when codelink.security.profile is \"custom\". Allow tools to delete files in the workspace."
+        },
+        "codelink.security.allowEditorWrite": {
+          "type": "boolean",
+          "default": true,
+          "description": "Only used when codelink.security.profile is \"custom\". Allow tools to modify open editor documents."
+        },
+        "codelink.security.allowTerminal": {
+          "type": "boolean",
+          "default": false,
+          "description": "Only used when codelink.security.profile is \"custom\". Allow tools to create and run terminal processes."
+        },
+        "codelink.security.allowGitWrite": {
+          "type": "boolean",
+          "default": false,
+          "description": "Only used when codelink.security.profile is \"custom\". Allow tools to perform Git write operations."
+        },
+        "codelink.remote.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Allow the MCP server to bind to a non-loopback host and accept authenticated remote connections. Disabled by default."
+        },
+        "codelink.files.excludePatterns": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [
+            "**/.git/**",
+            "**/node_modules/**",
+            "**/target/**",
+            "**/dist/**",
+            "**/build/**",
+            "**/.env",
+            "**/.env.*"
+          ],
+          "description": "Glob patterns excluded from workspace listing, search, and file access by default."
+        },
+        "codelink.files.maxReadBytes": {
+          "type": "integer",
+          "default": 10485760,
+          "description": "Maximum number of bytes a single file_read/editor_read call may return."
+        },
+        "codelink.files.maxWriteBytes": {
+          "type": "integer",
+          "default": 10485760,
+          "description": "Maximum number of bytes a single file_write call may accept."
+        },
+        "codelink.search.maxResults": {
+          "type": "integer",
+          "default": 100,
+          "description": "Maximum number of matches returned by a single search request."
+        },
+        "codelink.search.maxFileSize": {
+          "type": "integer",
+          "default": 10485760,
+          "description": "Files larger than this are skipped during search."
+        },
+        "codelink.search.timeoutMs": {
+          "type": "integer",
+          "default": 5000,
+          "description": "Maximum time a single search request may run before it is cancelled."
+        },
+        "codelink.terminal.timeoutMs": {
+          "type": "integer",
+          "default": 30000,
+          "description": "Maximum time a terminal_run command may execute before being killed."
+        },
+        "codelink.terminal.maxOutputBytes": {
+          "type": "integer",
+          "default": 1048576,
+          "description": "Maximum captured output size per terminal process."
+        },
+        "codelink.rateLimit.requestsPerMinute": {
+          "type": "integer",
+          "default": 120,
+          "description": "Maximum MCP requests accepted per minute per client, enforced when remote access is enabled."
+        },
+        "codelink.rateLimit.maxConcurrentRequests": {
+          "type": "integer",
+          "default": 8,
+          "description": "Maximum number of tool calls executed concurrently."
+        },
+        "codelink.logging.level": {
+          "type": "string",
+          "enum": ["error", "warn", "info", "debug"],
+          "default": "info",
+          "description": "Verbosity of the CodeLink output channel."
+        },
+        "codelink.tunnel.cloudflaredPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the cloudflared executable. Leave empty to search the system PATH."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsc -p ./",
+    "watch": "tsc -p ./ -w",
+    "compile": "tsc -p ./ --noEmit",
+    "lint": "eslint src",
+    "pretest": "npm run compile",
+    "test": "vitest run --config vitest.config.ts",
+    "test:watch": "vitest --config vitest.config.ts",
+    "build:test": "tsc -p ./tsconfig.test.json",
+    "test:vscode": "npm run build && npm run build:test && node ./out-test/runExtensionTests.js",
+    "vscode:prepublish": "npm run build",
+    "package": "vsce package -o ../codelink.vsix"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.9",
+    "@types/node": "^22.20.3",
+    "@types/vscode": "^1.96.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "@vscode/test-electron": "^2.5.2",
+    "@vscode/vsce": "^3.1.0",
+    "eslint": "^9.0.0",
+    "mocha": "^10.10.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}

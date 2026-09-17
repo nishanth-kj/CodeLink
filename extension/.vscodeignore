@@ -1,0 +1,10 @@
+src/**
+test/**
+out-test/**
+tsconfig*.json
+vitest.config.ts
+eslint.config.js
+**/*.map
+**/*.ts
+.gitignore
+**/tsconfig.tsbuildinfo
