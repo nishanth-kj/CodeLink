@@ -10,6 +10,11 @@ import { MAX_MESSAGE_BYTES, type IpcMessage } from "./protocol.js";
  * Correlating requests with responses is `RustBridge`'s job, not this
  * class's; this class only knows about a single process's lifecycle.
  */
+// The declare-interface + class merge below is the standard pattern for a
+// typed EventEmitter subclass (the same one Node's own .d.ts files use):
+// the interface only adds overloads for `on`, it never adds state, so the
+// merge cannot desynchronize class instances from the declared shape.
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export declare interface CoreProcess {
   on(event: "message", listener: (message: IpcMessage) => void): this;
   on(event: "stderr", listener: (line: string) => void): this;
@@ -17,6 +22,7 @@ export declare interface CoreProcess {
   on(event: "error", listener: (error: Error) => void): this;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CoreProcess extends EventEmitter {
   private child: ChildProcessWithoutNullStreams | undefined;
 
