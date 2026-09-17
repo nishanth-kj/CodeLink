@@ -7,6 +7,10 @@ on:
       - "v*"
     branches:
       - main
+      - development
+
+permissions:
+  contents: write
 
 jobs:
   build-core:
@@ -115,3 +119,23 @@ jobs:
           name: codelink-universal-vsix
           path: codelink-universal.vsix
           if-no-files-found: error
+
+      - name: Publish to VS Code Marketplace
+        if: startsWith(github.ref, 'refs/tags/v')
+        working-directory: extension
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          if [ -n "$VSCE_PAT" ]; then
+            echo "Publishing to VS Code Marketplace..."
+            npx vsce publish --packagePath ../codelink-universal.vsix -p "$VSCE_PAT"
+          else
+            echo "VSCE_PAT secret is not set in repository settings. Skipping marketplace publish."
+          fi
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: codelink-universal.vsix
+          generate_release_notes: true

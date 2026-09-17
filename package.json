@@ -1,7 +1,7 @@
 {
   "name": "codelink",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "CodeLink turns a local VS Code workspace into a secure Model Context Protocol (MCP) server for external AI agents.",
   "license": "MIT",
   "type": "module",
