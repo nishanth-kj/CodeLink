@@ -20,6 +20,7 @@ import { terminalTools } from "../tools/terminal.js";
 import { workspaceTools } from "../tools/workspace.js";
 import { CodeLinkError, ErrorCodes } from "../utils/errors.js";
 import type { Logger } from "../utils/logger.js";
+import { OAuthServer } from "../security/oauth.js";
 import { buildServerInfo, SERVER_INSTRUCTIONS } from "./capabilities.js";
 import { extractBearerToken, httpStatusForErrorCode, isHostHeaderAllowed, MCP_ENDPOINT_PATH } from "./protocol.js";
 import { SessionTracker } from "./session.js";
@@ -83,9 +84,11 @@ export class McpServerManager {
   private readonly sessions = new Map<string, McpSession>();
   private readonly sessionTracker = new SessionTracker();
   private readonly logger: Logger;
+  private readonly oauthServer: OAuthServer;
 
   constructor(private readonly options: McpServerManagerOptions) {
     this.logger = options.logger.child("mcp-server");
+    this.oauthServer = new OAuthServer(this.logger);
   }
 
   isRunning(): boolean {
@@ -231,7 +234,27 @@ export class McpServerManager {
 
   private async handleRequest(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
     const config = this.options.getConfig();
-    const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
+    const hostHeader = req.headers.host ?? "localhost";
+    const proto = req.headers["x-forwarded-proto"] ?? "https";
+    const hostUrl = `${proto}://${hostHeader}`;
+    const url = new URL(req.url ?? "/", hostUrl);
+
+    // 1. Intercept OAuth & OIDC discovery and authorization requests
+    if (this.oauthServer.isOAuthRequest(url.pathname)) {
+      await this.oauthServer.handleRequest(req, res, hostUrl);
+      return;
+    }
+
+    // 2. Set CORS headers for all MCP traffic
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, mcp-session-id");
+
+    if (req.method === "OPTIONS") {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
 
     if (url.pathname !== MCP_ENDPOINT_PATH) {
       res.writeHead(404, { "content-type": "application/json" });
@@ -249,14 +272,17 @@ export class McpServerManager {
     const clientId = req.socket.remoteAddress ?? "unknown";
     const bearerToken = extractBearerToken(req.headers.authorization);
 
-    try {
-      await this.options.policy.authorizeConnection({ clientId, bearerToken });
-    } catch (error) {
-      const code = CodeLinkError.isCodeLinkError(error) ? error.code : ErrorCodes.INTERNAL_ERROR;
-      const message = error instanceof Error ? error.message : String(error);
-      res.writeHead(httpStatusForErrorCode(code), { "content-type": "application/json" });
-      res.end(JSON.stringify({ error: { code, message } }));
-      return;
+    // If request has a valid OAuth token issued by our OAuth server, it is authorized
+    if (!this.oauthServer.isOAuthToken(bearerToken)) {
+      try {
+        await this.options.policy.authorizeConnection({ clientId, bearerToken });
+      } catch (error) {
+        const code = CodeLinkError.isCodeLinkError(error) ? error.code : ErrorCodes.INTERNAL_ERROR;
+        const message = error instanceof Error ? error.message : String(error);
+        res.writeHead(httpStatusForErrorCode(code), { "content-type": "application/json" });
+        res.end(JSON.stringify({ error: { code, message } }));
+        return;
+      }
     }
 
     const sessionIdHeader = req.headers["mcp-session-id"];

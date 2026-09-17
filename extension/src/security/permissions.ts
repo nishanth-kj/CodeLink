@@ -72,7 +72,24 @@ export type PermissionCheckResult = { allowed: true } | { allowed: false; code: 
  * or "custom profile with fileDelete on" means.
  */
 export class PermissionManager {
+  private readonly overrides = new Map<PermissionKey, boolean>();
+
   constructor(private readonly getConfig: () => CodeLinkConfig) {}
+
+  toggle(permission: PermissionKey): boolean {
+    const current = this.snapshot()[permission];
+    const next = !current;
+    this.overrides.set(permission, next);
+    return next;
+  }
+
+  setOverride(permission: PermissionKey, allowed: boolean): void {
+    this.overrides.set(permission, allowed);
+  }
+
+  clearOverrides(): void {
+    this.overrides.clear();
+  }
 
   private computeSet(): PermissionSet {
     const config = this.getConfig();
@@ -90,9 +107,13 @@ export class PermissionManager {
             gitWrite: config.security.allowGitWrite,
             remoteAccess: false,
           }
-        : SECURITY_PROFILES[config.security.profile];
+        : { ...SECURITY_PROFILES[config.security.profile] };
 
-    return { ...base, remoteAccess: config.remote.enabled };
+    const set: PermissionSet = { ...base, remoteAccess: config.remote.enabled };
+    for (const [key, value] of this.overrides.entries()) {
+      set[key] = value;
+    }
+    return set;
   }
 
   snapshot(): PermissionSet {

@@ -1,5 +1,7 @@
 import * as vscode from "vscode";
 import type { AppContext } from "../extension.js";
+import type { PermissionKey } from "../security/permissions.js";
+import { DashboardPanel } from "./dashboard.js";
 
 export class SidebarViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "codelink.sidebarView";
@@ -25,8 +27,8 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
 
     webviewView.webview.html = this.renderHtml();
 
-    webviewView.webview.onDidReceiveMessage((message: { command?: string }) => {
-      void this.handleMessage(message.command);
+    webviewView.webview.onDidReceiveMessage((message: { command?: string; permission?: string }) => {
+      void this.handleMessage(message);
     });
   }
 
@@ -36,7 +38,22 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private async handleMessage(command: string | undefined): Promise<void> {
+  private async handleMessage(message: { command?: string; permission?: string }): Promise<void> {
+    const { command, permission } = message;
+
+    if (command === "togglePermission" && permission) {
+      const key = permission as PermissionKey;
+      const next = this.ctx.permissions.toggle(key);
+      if (key === "remoteAccess") {
+        await vscode.workspace
+          .getConfiguration("codelink")
+          .update("remote.enabled", next, vscode.ConfigurationTarget.Workspace);
+      }
+      this.refresh();
+      DashboardPanel.refreshIfOpen(this.ctx);
+      return;
+    }
+
     const commandMap: Record<string, string> = {
       start: "codelink.startServer",
       stop: "codelink.stopServer",
@@ -48,13 +65,16 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
       copyTunnelUrl: "codelink.copyTunnelUrl",
       openDashboard: "codelink.openDashboard",
     };
+
     if (command === "toggleRemote") {
       const id = this.ctx.getConfig().remote.enabled ? "codelink.disableRemoteAccess" : "codelink.enableRemoteAccess";
       await vscode.commands.executeCommand(id);
     } else if (command && commandMap[command]) {
       await vscode.commands.executeCommand(commandMap[command]);
     }
+
     this.refresh();
+    DashboardPanel.refreshIfOpen(this.ctx);
   }
 
   private renderHtml(): string {
@@ -69,8 +89,8 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
     const escapeHtml = (value: string): string =>
       value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-    const permissionBadge = (label: string, allowed: boolean): string =>
-      `<span class="perm-badge ${allowed ? "allowed" : "blocked"}">${allowed ? "✓" : "✗"} ${escapeHtml(label)}</span>`;
+    const permissionBadge = (label: string, allowed: boolean, permKey: PermissionKey): string =>
+      `<button class="perm-chip ${allowed ? "allowed" : "blocked"}" data-perm="${permKey}" title="Click to toggle ${escapeHtml(label)} permission">${allowed ? "✓" : "✗"} ${escapeHtml(label)}</button>`;
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -118,9 +138,9 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
   button {
     flex: 1 1 auto;
     min-width: 60px;
-    padding: 4px 10px;
+    padding: 5px 10px;
     border: none;
-    border-radius: 2px;
+    border-radius: 3px;
     font-size: 12px;
     background: var(--vscode-button-background);
     color: var(--vscode-button-foreground);
@@ -139,6 +159,15 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
     letter-spacing: 0.5px;
     color: var(--vscode-sideBarTitle-foreground, var(--vscode-descriptionForeground));
     margin: 14px 0 6px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .hint-text {
+    font-size: 10px;
+    font-weight: normal;
+    text-transform: none;
+    opacity: 0.7;
   }
   .code-box {
     background: var(--vscode-textCodeBlock-background);
@@ -154,18 +183,37 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
   .perm-grid {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px;
+    gap: 5px;
     margin: 6px 0;
   }
-  .perm-badge {
-    font-size: 10.5px;
-    padding: 2px 6px;
-    border-radius: 3px;
+  .perm-chip {
+    flex: 0 1 auto;
+    min-width: auto;
+    font-size: 11.5px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--vscode-widget-border, transparent);
     background: var(--vscode-badge-background);
     color: var(--vscode-badge-foreground);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    user-select: none;
+    font-family: inherit;
   }
-  .perm-badge.blocked {
-    opacity: 0.55;
+  .perm-chip:hover {
+    filter: brightness(1.15);
+    transform: translateY(-1px);
+  }
+  .perm-chip.allowed {
+    background: var(--vscode-testing-iconPassed, #2e7d32);
+    color: #ffffff;
+    font-weight: 600;
+  }
+  .perm-chip.blocked {
+    background: var(--vscode-editor-inactiveSelectionBackground);
+    color: var(--vscode-descriptionForeground);
+    opacity: 0.75;
+    border-style: dashed;
   }
   .footer-links {
     margin-top: 14px;
@@ -178,7 +226,7 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
       <span class="indicator ${running ? "running" : "stopped"}"></span>
       <span>MCP Server: ${running ? "Running" : "Stopped"}</span>
     </div>
-    ${endpoint ? `<div style="font-size:11px; margin-top: 4px;">Endpoint:</div><code class="code-box">${escapeHtml(endpoint)}</code>` : ""}
+    ${endpoint ? `<div style="font-size:11px; margin-top: 4px;">Local Endpoint:</div><code class="code-box">${escapeHtml(endpoint)}</code>` : ""}
     <div class="btn-row">
       ${!running ? `<button data-command="start">Start Server</button>` : `<button class="secondary" data-command="stop">Stop Server</button>`}
       ${running ? `<button class="secondary" data-command="restart">Restart</button>` : ""}
@@ -186,20 +234,42 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
     </div>
   </div>
 
-  <h3>Security Profile (${escapeHtml(config.security.profile)})</h3>
+  <h3>
+    <span>Permissions</span>
+    <span class="hint-text">(click any to toggle)</span>
+  </h3>
   <div class="perm-grid">
-    ${permissionBadge("Read", permissions.workspaceRead)}
-    ${permissionBadge("Search", permissions.workspaceSearch)}
-    ${permissionBadge("Editor", permissions.editorRead)}
-    ${permissionBadge("Edit", permissions.editorWrite)}
-    ${permissionBadge("Write", permissions.fileWrite)}
-    ${permissionBadge("Delete", permissions.fileDelete)}
-    ${permissionBadge("Terminal", permissions.terminal)}
-    ${permissionBadge("Git", permissions.gitRead)}
-    ${permissionBadge("Remote", permissions.remoteAccess)}
+    ${permissionBadge("Read", permissions.workspaceRead, "workspaceRead")}
+    ${permissionBadge("Search", permissions.workspaceSearch, "workspaceSearch")}
+    ${permissionBadge("Editor", permissions.editorRead, "editorRead")}
+    ${permissionBadge("Edit", permissions.editorWrite, "editorWrite")}
+    ${permissionBadge("Write", permissions.fileWrite, "fileWrite")}
+    ${permissionBadge("Delete", permissions.fileDelete, "fileDelete")}
+    ${permissionBadge("Terminal", permissions.terminal, "terminal")}
+    ${permissionBadge("Git", permissions.gitWrite, "gitWrite")}
+    ${permissionBadge("Remote", permissions.remoteAccess, "remoteAccess")}
   </div>
 
-  <h3>Remote Access</h3>
+  <h3>Cloudflare Tunnel</h3>
+  <div style="font-size: 11.5px; margin-bottom: 4px;">
+    Status: <strong>${tunnelRunning ? "Running" : "Stopped"}</strong>
+  </div>
+  ${
+    tunnelRunning && tunnelUrl
+      ? `
+  <div style="font-size: 11px; margin-top: 4px;">Direct Web MCP Endpoint:</div>
+  <code class="code-box">${escapeHtml(tunnelUrl.endsWith("/") ? `${tunnelUrl}mcp` : `${tunnelUrl}/mcp`)}</code>
+  <div class="btn-row">
+    <button data-command="copyTunnelUrl">Copy Tunnel URL</button>
+    <button class="secondary" data-command="stopTunnel">Stop Tunnel</button>
+  </div>`
+      : `
+  <div class="btn-row">
+    <button data-command="startTunnel">Start Tunnel &amp; Copy Link</button>
+  </div>`
+  }
+
+  <h3>Remote Access &amp; Tokens</h3>
   <div style="font-size: 11.5px; margin-bottom: 4px;">
     Status: <strong>${config.remote.enabled ? "Enabled" : "Disabled"}</strong>
   </div>
@@ -207,21 +277,6 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
     <button class="secondary" data-command="toggleRemote">${config.remote.enabled ? "Disable" : "Enable"}</button>
     <button class="secondary" data-command="generateToken">New Token</button>
   </div>
-
-  <h3>Cloudflare Tunnel</h3>
-  <div style="font-size: 11.5px; margin-bottom: 4px;">
-    Status: <strong>${tunnelRunning ? "Running" : "Stopped"}</strong>
-  </div>
-  ${tunnelRunning && tunnelUrl ? `
-  <div style="font-size: 11px; margin-top: 4px;">Direct Web MCP Endpoint:</div>
-  <code class="code-box">${escapeHtml(tunnelUrl.endsWith("/") ? `${tunnelUrl}mcp` : `${tunnelUrl}/mcp`)}</code>
-  <div class="btn-row">
-    <button data-command="copyTunnelUrl">Copy Tunnel URL</button>
-    <button class="secondary" data-command="stopTunnel">Stop Tunnel</button>
-  </div>` : `
-  <div class="btn-row">
-    <button data-command="startTunnel">Start Tunnel &amp; Copy Link</button>
-  </div>`}
 
   <div class="footer-links">
     <button class="secondary" style="width: 100%;" data-command="openDashboard">Open Full Dashboard ↗</button>
@@ -232,6 +287,11 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
     document.querySelectorAll("button[data-command]").forEach((btn) => {
       btn.addEventListener("click", () => {
         vscode.postMessage({ command: btn.getAttribute("data-command") });
+      });
+    });
+    document.querySelectorAll("button[data-perm]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        vscode.postMessage({ command: "togglePermission", permission: btn.getAttribute("data-perm") });
       });
     });
   </script>
