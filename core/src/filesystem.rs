@@ -408,6 +408,15 @@ mod tests {
     }
 
     #[test]
+    fn read_rejects_oversized_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = root_json(dir.path());
+        write(json!({ "root": root, "path": "big.txt", "content": "0123456789" })).unwrap();
+        let err = read(json!({ "root": root, "path": "big.txt", "maxBytes": 5 })).unwrap_err();
+        assert_eq!(err.code, "FILE_TOO_LARGE");
+    }
+
+    #[test]
     fn write_respects_max_bytes() {
         let dir = tempfile::tempdir().unwrap();
         let root = root_json(dir.path());

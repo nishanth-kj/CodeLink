@@ -386,4 +386,30 @@ mod tests {
         let err = output(json!({ "id": "does-not-exist" })).unwrap_err();
         assert_eq!(err.code, "PROCESS_NOT_FOUND");
     }
+
+    #[test]
+    fn timeout_kills_a_long_running_process() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().to_string_lossy().to_string();
+        let (command, args) = if cfg!(windows) {
+            (
+                "ping".to_string(),
+                vec!["-n".to_string(), "30".to_string(), "127.0.0.1".to_string()],
+            )
+        } else {
+            ("sleep".to_string(), vec!["30".to_string()])
+        };
+
+        let spawn_result = spawn(json!({
+            "root": root,
+            "command": command,
+            "args": args,
+            "timeoutMs": 200,
+        }))
+        .unwrap();
+        let id = spawn_result["id"].as_str().unwrap().to_string();
+
+        let result = wait_for_exit(&id, Duration::from_secs(5));
+        assert_eq!(result["status"], "timedout");
+    }
 }

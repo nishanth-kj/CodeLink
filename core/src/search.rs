@@ -246,6 +246,29 @@ mod tests {
     }
 
     #[test]
+    fn skips_files_larger_than_max_file_size() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("small.txt"), "needle").unwrap();
+        std::fs::write(
+            dir.path().join("big.txt"),
+            "needle padded well past the size cap",
+        )
+        .unwrap();
+        let result = text(
+            json!({
+                "root": dir.path().to_string_lossy(),
+                "query": "needle",
+                "maxFileSize": 10,
+            }),
+            no_cancel(),
+        )
+        .unwrap();
+        let matches = result["matches"].as_array().unwrap();
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0]["file"], "small.txt");
+    }
+
+    #[test]
     fn cancellation_stops_search() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("a.txt"), "needle").unwrap();
