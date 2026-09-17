@@ -15,6 +15,7 @@ export const DEFAULT_CONFIG: CodeLinkConfig = {
   },
   security: {
     profile: "developer",
+    requireAuth: true,
     allowFileWrite: true,
     allowFileDelete: false,
     allowEditorWrite: true,

@@ -10,6 +10,7 @@ export interface CodeLinkConfig {
   };
   security: {
     profile: SecurityProfile;
+    requireAuth: boolean;
     allowFileWrite: boolean;
     allowFileDelete: boolean;
     allowEditorWrite: boolean;

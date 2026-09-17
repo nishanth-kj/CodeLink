@@ -75,6 +75,11 @@
           "default": "developer",
           "description": "Security profile controlling which tool permissions are granted."
         },
+        "codelink.security.requireAuth": {
+          "type": "boolean",
+          "default": false,
+          "description": "Require authentication (OAuth 2.0 or bearer token). When false, clients can connect freely with No Auth."
+        },
         "codelink.security.allowFileWrite": {
           "type": "boolean",
           "default": true,

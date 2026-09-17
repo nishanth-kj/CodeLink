@@ -23,6 +23,8 @@ export interface ConnectionContext {
  * tool-routing logic at all.
  */
 export class SecurityPolicy {
+  private requireAuthOverride: boolean | undefined = undefined;
+
   constructor(
     private readonly permissions: PermissionManager,
     private readonly authentication: AuthenticationManager,
@@ -31,9 +33,29 @@ export class SecurityPolicy {
     private readonly logger: Logger,
   ) {}
 
-  async authorizeConnection(context: ConnectionContext): Promise<void> {
+  isAuthRequired(): boolean {
+    if (this.requireAuthOverride !== undefined) {
+      return this.requireAuthOverride;
+    }
     const config = this.getConfig();
     if (!config.remote.enabled) {
+      return false;
+    }
+    return config.security?.requireAuth ?? true;
+  }
+
+  setAuthRequired(required: boolean): void {
+    this.requireAuthOverride = required;
+  }
+
+  toggleAuthRequired(): boolean {
+    const next = !this.isAuthRequired();
+    this.requireAuthOverride = next;
+    return next;
+  }
+
+  async authorizeConnection(context: ConnectionContext): Promise<void> {
+    if (!this.isAuthRequired()) {
       return;
     }
 
@@ -42,7 +64,7 @@ export class SecurityPolicy {
       this.logger.warn("Rejected connection: authentication failed", { clientId: context.clientId });
       throw new CodeLinkError(
         context.bearerToken ? ErrorCodes.AUTHENTICATION_FAILED : ErrorCodes.AUTHENTICATION_REQUIRED,
-        "A valid bearer token is required for remote access.",
+        "A valid bearer token or OAuth authorization is required.",
       );
     }
 

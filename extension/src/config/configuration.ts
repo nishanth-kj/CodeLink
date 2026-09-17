@@ -20,6 +20,7 @@ export function loadConfig(): CodeLinkConfig {
     },
     security: {
       profile: read<SecurityProfile>(c, "security.profile", DEFAULT_CONFIG.security.profile),
+      requireAuth: read(c, "security.requireAuth", DEFAULT_CONFIG.security.requireAuth),
       allowFileWrite: read(c, "security.allowFileWrite", DEFAULT_CONFIG.security.allowFileWrite),
       allowFileDelete: read(c, "security.allowFileDelete", DEFAULT_CONFIG.security.allowFileDelete),
       allowEditorWrite: read(c, "security.allowEditorWrite", DEFAULT_CONFIG.security.allowEditorWrite),

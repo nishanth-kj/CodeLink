@@ -235,7 +235,8 @@ export class McpServerManager {
   private async handleRequest(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
     const config = this.options.getConfig();
     const hostHeader = req.headers.host ?? "localhost";
-    const proto = req.headers["x-forwarded-proto"] ?? "https";
+    const defaultProto = hostHeader.startsWith("localhost") || hostHeader.startsWith("127.0.0.1") ? "http" : "https";
+    const proto = (req.headers["x-forwarded-proto"] as string) ?? defaultProto;
     const hostUrl = `${proto}://${hostHeader}`;
     const url = new URL(req.url ?? "/", hostUrl);
 
@@ -247,12 +248,29 @@ export class McpServerManager {
 
     // 2. Set CORS headers for all MCP traffic
     res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, mcp-session-id");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, HEAD");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, Mcp-Session-Id, x-mcp-session-id");
+    res.setHeader("Access-Control-Expose-Headers", "WWW-Authenticate, Mcp-Session-Id, x-mcp-session-id");
 
     if (req.method === "OPTIONS") {
       res.writeHead(204);
       res.end();
+      return;
+    }
+
+    // Friendly root info for browsers or health checks
+    if (url.pathname === "/" || url.pathname === "") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({
+          name: "CodeLink MCP Server",
+          version: this.options.extensionVersion,
+          status: "running",
+          mcp_endpoint: `${hostUrl}${MCP_ENDPOINT_PATH}`,
+          oauth_discovery: `${hostUrl}/.well-known/oauth-authorization-server`,
+          protected_resource_metadata: `${hostUrl}/.well-known/oauth-protected-resource`,
+        }),
+      );
       return;
     }
 
@@ -272,16 +290,23 @@ export class McpServerManager {
     const clientId = req.socket.remoteAddress ?? "unknown";
     const bearerToken = extractBearerToken(req.headers.authorization);
 
-    // If request has a valid OAuth token issued by our OAuth server, it is authorized
-    if (!this.oauthServer.isOAuthToken(bearerToken)) {
-      try {
-        await this.options.policy.authorizeConnection({ clientId, bearerToken });
-      } catch (error) {
-        const code = CodeLinkError.isCodeLinkError(error) ? error.code : ErrorCodes.INTERNAL_ERROR;
-        const message = error instanceof Error ? error.message : String(error);
-        res.writeHead(httpStatusForErrorCode(code), { "content-type": "application/json" });
-        res.end(JSON.stringify({ error: { code, message } }));
-        return;
+    // If Auth is required, verify OAuth token or policy connection authorization
+    if (this.options.policy.isAuthRequired()) {
+      if (!this.oauthServer.isOAuthToken(bearerToken)) {
+        try {
+          await this.options.policy.authorizeConnection({ clientId, bearerToken });
+        } catch (error) {
+          const code = CodeLinkError.isCodeLinkError(error) ? error.code : ErrorCodes.INTERNAL_ERROR;
+          const message = error instanceof Error ? error.message : String(error);
+          const status = httpStatusForErrorCode(code);
+          const headers: Record<string, string> = { "content-type": "application/json" };
+          if (status === 401) {
+            headers["WWW-Authenticate"] = `Bearer resource_metadata="${hostUrl}/.well-known/oauth-protected-resource"`;
+          }
+          res.writeHead(status, headers);
+          res.end(JSON.stringify({ error: { code, message } }));
+          return;
+        }
       }
     }
 
