@@ -31,7 +31,7 @@ export class SecurityPolicy {
     private readonly rateLimiter: RateLimiter,
     private readonly getConfig: () => CodeLinkConfig,
     private readonly logger: Logger,
-  ) {}
+  ) { }
 
   isAuthRequired(): boolean {
     if (this.requireAuthOverride !== undefined) {
@@ -113,7 +113,7 @@ export function checkFileAccess(workspaceRoot: string, requestedPath: string, al
     throw new CodeLinkError(
       ErrorCodes.SECRET_ACCESS_DENIED,
       `Access to '${relative}' is blocked because it looks like a secret file. ` +
-        "Enable codelink.security.allowSecretFileAccess to override.",
+      "Enable codelink.security.allowSecretFileAccess to override.",
     );
   }
   return relative;

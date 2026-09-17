@@ -213,9 +213,9 @@ export class OAuthServer {
 <body>
   <div class="card">
     <h2>CodeLink MCP Authorization</h2>
-    <p>Authorizing connection to your local VS Code workspace...</p>
-    <p><small style="opacity: 0.7;">Redirecting back to Claude automatically...</small></p>
-    <a class="btn" href="${targetUrl}">Click here if not redirected</a>
+    <p>Authorizing connection to workspace...</p>
+    <p><small style="opacity: 0.7;">Redirecting automatically...</small></p>
+    <a class="btn" href="${targetUrl}">Continue</a>
   </div>
 </body>
 </html>`);

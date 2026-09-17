@@ -16,5 +16,6 @@
   "rust-analyzer.linkedProjects": [
     "core/Cargo.toml"
   ],
-  "codelink.remote.enabled": true
+  "codelink.remote.enabled": true,
+  "codelink.security.requireAuth": false
 }

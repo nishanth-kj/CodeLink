@@ -6,12 +6,13 @@ function escapeHtml(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-function permissionChip(label: string, desc: string, allowed: boolean, permKey: PermissionKey): string {
+function permissionCard(label: string, desc: string, allowed: boolean, permKey: PermissionKey): string {
   return `
-    <button class="perm-card ${allowed ? "allowed" : "blocked"}" data-perm="${permKey}" title="Click to toggle ${escapeHtml(label)}">
-      <div class="perm-card-header">
-        <span class="perm-card-status">${allowed ? "✓" : "✗"}</span>
+    <button class="perm-card ${allowed ? "active" : "inactive"}" data-perm="${permKey}" title="Toggle ${escapeHtml(label)}">
+      <div class="perm-card-top">
+        <span class="indicator-dot ${allowed ? "on" : "off"}"></span>
         <span class="perm-card-title">${escapeHtml(label)}</span>
+        <span class="perm-card-badge ${allowed ? "on" : "off"}">${allowed ? "ON" : "OFF"}</span>
       </div>
       <div class="perm-card-desc">${escapeHtml(desc)}</div>
     </button>`;
@@ -38,281 +39,252 @@ function renderHtml(ctx: AppContext): string {
   :root {
     --bg: var(--vscode-editor-background, #0f172a);
     --fg: var(--vscode-editor-foreground, #f8fafc);
-    --card-bg: var(--vscode-editor-inactiveSelectionBackground, rgba(30, 41, 59, 0.6));
-    --card-border: var(--vscode-widget-border, rgba(255, 255, 255, 0.08));
-    --accent: var(--vscode-button-background, #38bdf8);
-    --accent-fg: var(--vscode-button-foreground, #0f172a);
-    --success: #22c55e;
-    --danger: #ef4444;
+    --card-bg: var(--vscode-editor-inactiveSelectionBackground, rgba(255, 255, 255, 0.03));
+    --border: var(--vscode-widget-border, rgba(255, 255, 255, 0.08));
     --muted: var(--vscode-descriptionForeground, #94a3b8);
+    --success: #22c55e;
   }
 
   body {
     background: var(--bg);
     color: var(--fg);
-    font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
+    font-family: var(--vscode-font-family, sans-serif);
+    font-size: var(--vscode-font-size, 13px);
     margin: 0;
-    padding: 24px 32px;
+    padding: 24px 28px;
     box-sizing: border-box;
+    line-height: 1.5;
   }
 
   .header {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 16px;
+    margin-bottom: 20px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-bottom: 1px solid var(--card-border);
-    padding-bottom: 20px;
-    margin-bottom: 24px;
     flex-wrap: wrap;
-    gap: 16px;
-  }
-
-  .brand {
-    display: flex;
-    align-items: center;
     gap: 12px;
   }
 
-  .logo-badge {
-    background: linear-gradient(135deg, #0ea5e9, #6366f1);
-    color: white;
-    font-weight: 800;
-    font-size: 16px;
-    padding: 8px 12px;
-    border-radius: 8px;
-    letter-spacing: -0.5px;
-    box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
-  }
-
   h1 {
-    font-size: 22px;
-    margin: 0;
+    font-size: 18px;
     font-weight: 700;
+    margin: 0 0 4px 0;
   }
 
-  .subtitle {
+  .meta {
+    font-size: 12px;
     color: var(--muted);
-    font-size: 13px;
-    margin-top: 3px;
   }
 
-  .status-badges {
+  .status-group {
     display: flex;
-    gap: 10px;
-    align-items: center;
+    gap: 8px;
     flex-wrap: wrap;
   }
 
-  .pill {
+  .status-tag {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 5px 12px;
-    border-radius: 20px;
-    font-size: 12px;
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 11.5px;
     font-weight: 600;
     background: var(--card-bg);
-    border: 1px solid var(--card-border);
   }
 
-  .dot {
-    width: 8px;
-    height: 8px;
+  .indicator-dot {
+    width: 6px;
+    height: 6px;
     border-radius: 50%;
+    flex-shrink: 0;
   }
-  .dot.green { background: var(--success); box-shadow: 0 0 8px rgba(34,197,94,0.6); }
-  .dot.gray { background: #94a3b8; }
-  .dot.blue { background: #38bdf8; box-shadow: 0 0 8px rgba(56,189,248,0.6); }
+  .indicator-dot.on { background: var(--success); }
+  .indicator-dot.off { background: #94a3b8; }
 
-  /* Layout Grid */
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
-    gap: 20px;
-    margin-bottom: 24px;
-  }
-
-  .card {
+  /* Sections */
+  .section {
     background: var(--card-bg);
-    border: 1px solid var(--card-border);
-    border-radius: 10px;
-    padding: 20px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px 18px;
+    margin-bottom: 16px;
   }
 
-  .card-title {
-    font-size: 15px;
+  .section-header {
+    font-size: 13px;
     font-weight: 700;
-    margin: 0 0 14px 0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 0 0 10px 0;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    color: var(--fg);
+  }
+
+  .code-line {
+    background: var(--vscode-textCodeBlock-background, rgba(0,0,0,0.3));
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 8px 10px;
+    font-family: var(--vscode-editor-font-family, Consolas, monospace);
+    font-size: 12px;
+    margin: 6px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    word-break: break-all;
+    user-select: all;
   }
 
   .btn-row {
     display: flex;
-    gap: 8px;
+    gap: 6px;
     flex-wrap: wrap;
-    margin-top: 14px;
+    margin-top: 10px;
   }
 
   button {
-    padding: 8px 16px;
-    border-radius: 6px;
+    padding: 6px 12px;
+    border-radius: 4px;
     border: none;
-    font-size: 12.5px;
-    font-weight: 600;
+    font-size: 12px;
+    font-weight: 500;
     background: var(--vscode-button-background);
     color: var(--vscode-button-foreground);
     cursor: pointer;
-    transition: all 0.15s ease;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
     font-family: inherit;
+    transition: opacity 0.1s;
   }
   button:hover {
     background: var(--vscode-button-hoverBackground);
-    transform: translateY(-1px);
-  }
-  button:active {
-    transform: translateY(0);
   }
 
   button.secondary {
-    background: var(--vscode-button-secondaryBackground, rgba(255,255,255,0.08));
+    background: var(--vscode-button-secondaryBackground, rgba(255,255,255,0.06));
     color: var(--vscode-button-secondaryForeground, var(--fg));
-    border: 1px solid var(--card-border);
+    border: 1px solid var(--border);
   }
   button.secondary:hover {
-    background: var(--vscode-button-secondaryHoverBackground, rgba(255,255,255,0.15));
+    background: var(--vscode-button-secondaryHoverBackground, rgba(255,255,255,0.12));
   }
 
-  .code-box {
-    background: var(--vscode-textCodeBlock-background, rgba(0,0,0,0.3));
-    border: 1px solid var(--card-border);
-    border-radius: 6px;
-    padding: 10px 12px;
-    font-family: var(--vscode-editor-font-family, Consolas, monospace);
-    font-size: 12px;
-    word-break: break-all;
-    margin: 8px 0;
-    user-select: all;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-  }
-
-  /* Auth Mode Segmented Control */
-  .auth-selector {
+  /* Segmented Control */
+  .switch-box {
     display: flex;
     background: var(--vscode-input-background, rgba(0,0,0,0.25));
-    border: 1px solid var(--card-border);
-    border-radius: 8px;
-    padding: 4px;
-    gap: 4px;
-    margin: 12px 0;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 3px;
+    gap: 3px;
+    margin: 10px 0;
   }
 
-  .auth-mode-btn {
+  .switch-btn {
     flex: 1;
-    padding: 10px 14px;
-    font-size: 13px;
+    padding: 7px 12px;
+    font-size: 12px;
     font-weight: 600;
     border: none;
-    border-radius: 6px;
+    border-radius: 3px;
     cursor: pointer;
     background: transparent;
     color: var(--muted);
-    transition: all 0.2s ease;
-    justify-content: center;
     text-align: center;
   }
 
-  .auth-mode-btn.active {
+  .switch-btn.active {
     background: var(--vscode-button-background);
     color: var(--vscode-button-foreground);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
   }
 
-  .auth-mode-btn:not(.active):hover {
-    background: rgba(255,255,255,0.06);
+  .switch-btn:not(.active):hover {
+    background: rgba(255,255,255,0.04);
     color: var(--fg);
   }
 
-  .auth-callout {
-    padding: 12px 14px;
-    border-radius: 6px;
-    font-size: 12.5px;
-    line-height: 1.5;
-    margin-top: 8px;
-    border: 1px solid transparent;
+  .notice-box {
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    margin-top: 6px;
+    border: 1px solid var(--border);
+    color: var(--muted);
   }
-  .auth-callout.open {
-    background: rgba(34, 197, 94, 0.12);
+  .notice-box.open {
     border-color: rgba(34, 197, 94, 0.3);
     color: #86efac;
+    background: rgba(34, 197, 94, 0.08);
   }
-  .auth-callout.protected {
-    background: rgba(56, 189, 248, 0.12);
+  .notice-box.protected {
     border-color: rgba(56, 189, 248, 0.3);
     color: #bae6fd;
+    background: rgba(56, 189, 248, 0.08);
   }
 
   /* Permissions Grid */
   .perm-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-    gap: 10px;
-    margin-top: 12px;
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: 8px;
+    margin-top: 10px;
   }
 
   .perm-card {
     padding: 10px 12px;
-    border-radius: 8px;
-    border: 1px solid var(--card-border);
+    border-radius: 4px;
+    border: 1px solid var(--border);
     cursor: pointer !important;
-    transition: all 0.15s ease;
     text-align: left;
     display: flex;
     flex-direction: column;
     gap: 4px;
-    user-select: none;
-  }
-
-  .perm-card:hover {
-    transform: translateY(-2px);
-    filter: brightness(1.15);
-  }
-
-  .perm-card.allowed {
-    background: rgba(34, 197, 94, 0.15);
-    border-color: rgba(34, 197, 94, 0.4);
-    color: #ffffff;
-  }
-  .perm-card.allowed .perm-card-status {
-    color: #4ade80;
-    font-weight: 800;
-  }
-
-  .perm-card.blocked {
     background: rgba(255, 255, 255, 0.02);
+    color: var(--fg);
+  }
+
+  .perm-card.active {
+    border-color: #22c55e;
+    background: rgba(34, 197, 94, 0.1);
+  }
+
+  .perm-card.inactive {
     border-style: dashed;
     color: var(--muted);
   }
-  .perm-card.blocked .perm-card-status {
-    color: #f87171;
-    font-weight: 800;
-  }
 
-  .perm-card-header {
+  .perm-card-top {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     font-weight: 600;
-    font-size: 13px;
+    font-size: 12px;
+  }
+
+  .perm-card-title {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .perm-card-badge {
+    font-size: 9.5px;
+    font-weight: 700;
+    padding: 1px 4px;
+    border-radius: 2px;
+  }
+  .perm-card-badge.on {
+    background: #15803d;
+    color: #ffffff;
+  }
+  .perm-card-badge.off {
+    background: rgba(255,255,255,0.08);
+    color: var(--muted);
   }
 
   .perm-card-desc {
@@ -321,187 +293,132 @@ function renderHtml(ctx: AppContext): string {
     line-height: 1.3;
   }
 
-  /* Quick connect guide tabs */
-  .guide-box {
-    background: var(--vscode-textCodeBlock-background, rgba(0,0,0,0.3));
-    border: 1px solid var(--card-border);
-    border-radius: 6px;
-    padding: 12px 16px;
-    font-size: 12.5px;
-    line-height: 1.6;
-    margin-top: 10px;
-  }
   .guide-step {
-    margin-bottom: 6px;
-  }
-  .step-num {
-    display: inline-block;
-    width: 20px;
-    height: 20px;
-    line-height: 20px;
-    text-align: center;
-    border-radius: 50%;
-    background: var(--vscode-button-background);
-    color: var(--vscode-button-foreground);
-    font-size: 11px;
-    font-weight: 700;
-    margin-right: 6px;
+    font-size: 12px;
+    color: var(--muted);
+    margin: 4px 0;
   }
 </style>
 </head>
 <body>
   <!-- Header -->
   <div class="header">
-    <div class="brand">
-      <div class="logo-badge">CL</div>
-      <div>
-        <h1>CodeLink Control Center</h1>
-        <div class="subtitle">Workspace: <code>${escapeHtml(ctx.workspaceName)}</code> (${escapeHtml(ctx.workspaceRoot)})</div>
-      </div>
+    <div>
+      <h1>CodeLink Control Center</h1>
+      <div class="meta">Workspace: <code>${escapeHtml(ctx.workspaceName)}</code> (${escapeHtml(ctx.workspaceRoot)})</div>
     </div>
-    <div class="status-badges">
-      <div class="pill">
-        <span class="dot ${running ? "green" : "gray"}"></span>
-        MCP Server: ${running ? "Running" : "Stopped"}
+    <div class="status-group">
+      <div class="status-tag">
+        <span class="indicator-dot ${running ? "on" : "off"}"></span>
+        Server: ${running ? "Running" : "Stopped"}
       </div>
-      <div class="pill">
-        <span class="dot ${tunnelRunning ? "green" : "gray"}"></span>
-        Tunnel: ${tunnelRunning ? "Live" : "Inactive"}
+      <div class="status-tag">
+        <span class="indicator-dot ${tunnelRunning ? "on" : "off"}"></span>
+        Tunnel: ${tunnelRunning ? "Active" : "Stopped"}
       </div>
-      <div class="pill">
-        <span class="dot ${authRequired ? "blue" : "green"}"></span>
-        Auth: ${authRequired ? "🔒 Protected" : "🔓 Open Access"}
+      <div class="status-tag">
+        <span class="indicator-dot ${authRequired ? "off" : "on"}"></span>
+        Auth: ${authRequired ? "Require Auth" : "No Auth"}
       </div>
     </div>
   </div>
 
-  <div class="grid">
-    <!-- Card 1: Cloudflare Tunnel & Endpoints -->
-    <div class="card">
-      <div class="card-title">
-        <span>🌐 Cloudflare Public Tunnel</span>
-        <span style="font-size:12px; font-weight:normal;" class="pill">${tunnelRunning ? "Active" : "Stopped"}</span>
-      </div>
-      <p style="font-size:13px; color:var(--muted); margin:0 0 10px 0;">
-        Provides a public HTTPS URL enabling remote AI clients (Claude.ai Web, Cursor, ChatGPT) to reach your local workspace.
-      </p>
-      ${
-        tunnelRunning && tunnelMcp
-          ? `
-      <div style="font-size:11.5px; font-weight:600; color:var(--muted); margin-top:8px;">Direct Web MCP Endpoint:</div>
-      <div class="code-box">
-        <span>${escapeHtml(tunnelMcp)}</span>
-        <button class="secondary" style="padding:4px 8px; font-size:11px;" data-command="copyTunnelUrl">Copy</button>
-      </div>
-      <div class="btn-row">
-        <button data-command="copyTunnelUrl">Copy Tunnel Link</button>
-        <button class="secondary" data-command="stopTunnel">Stop Tunnel</button>
-      </div>
-      `
-          : `
-      <div class="btn-row">
-        <button data-command="startTunnel">Start Tunnel &amp; Copy Link</button>
-      </div>
-      `
-      }
-      ${
-        localEndpoint
-          ? `
-      <div style="font-size:11.5px; font-weight:600; color:var(--muted); margin-top:14px;">Local Endpoint:</div>
-      <div class="code-box">
-        <span>${escapeHtml(localEndpoint)}</span>
-      </div>
-      `
-          : ""
-      }
+  <!-- Section 1: Connection Endpoints -->
+  <div class="section">
+    <div class="section-header">Endpoints</div>
+    ${
+      tunnelRunning && tunnelMcp
+        ? `
+    <div class="meta" style="margin-bottom:2px;">Public Tunnel Endpoint:</div>
+    <div class="code-line">
+      <span>${escapeHtml(tunnelMcp)}</span>
+      <button class="secondary" style="padding:2px 8px; font-size:11px;" data-command="copyTunnelUrl">Copy</button>
     </div>
-
-    <!-- Card 2: Authentication Mode Selector (User Feature Request) -->
-    <div class="card">
-      <div class="card-title">
-        <span>🔑 Authentication Mode</span>
-        <span style="font-size:12px; font-weight:normal;" class="pill">${authRequired ? "OAuth / Token" : "No Auth (Open)"}</span>
-      </div>
-      <p style="font-size:13px; color:var(--muted); margin:0;">
-        Choose whether remote clients must authenticate or can connect directly with zero friction:
-      </p>
-
-      <div class="auth-selector">
-        <button class="auth-mode-btn ${!authRequired ? "active" : ""}" data-auth="none">
-          🔓 No Auth (Open Access)
-        </button>
-        <button class="auth-mode-btn ${authRequired ? "active" : ""}" data-auth="required">
-          🔒 OAuth / Token Auth
-        </button>
-      </div>
-
-      ${
-        !authRequired
-          ? `
-      <div class="auth-callout open">
-        <strong>🔓 No Auth Active:</strong> Clients connect directly to your MCP endpoint with zero login prompts or token errors. Perfect for fast testing in Claude.ai Web, Cursor, or local agents!
-      </div>
-      `
-          : `
-      <div class="auth-callout protected">
-        <strong>🔒 Auth Required Active:</strong> Clients must complete RFC 8414 / RFC 9728 OAuth discovery or provide a CodeLink Bearer Access Token.
-      </div>
-      <div class="btn-row">
-        <button class="secondary" data-command="generateToken">Generate Bearer Token</button>
-      </div>
-      `
-      }
+    <div class="btn-row">
+      <button data-command="copyTunnelUrl">Copy Tunnel URL</button>
+      <button class="secondary" data-command="stopTunnel">Stop Tunnel</button>
     </div>
+    `
+        : `
+    <div class="btn-row">
+      <button data-command="startTunnel">Start Tunnel &amp; Copy URL</button>
+    </div>
+    `
+    }
+    ${
+      localEndpoint
+        ? `
+    <div class="meta" style="margin-top:10px; margin-bottom:2px;">Local Endpoint:</div>
+    <div class="code-line">
+      <span>${escapeHtml(localEndpoint)}</span>
+    </div>
+    <div class="btn-row">
+      ${!running ? `<button data-command="start">Start Server</button>` : `<button class="secondary" data-command="stop">Stop Server</button>`}
+      ${running ? `<button class="secondary" data-command="restart">Restart Server</button>` : ""}
+    </div>
+    `
+        : ""
+    }
   </div>
 
-  <!-- Card 3: Permissions Matrix -->
-  <div class="card" style="margin-bottom: 24px;">
-    <div class="card-title">
-      <div>
-        <span>🛡️ Workspace Permissions</span>
-        <span style="font-size:12px; font-weight:normal; color:var(--muted); margin-left:8px;">(Click any card to toggle live)</span>
-      </div>
+  <!-- Section 2: Authentication Mode -->
+  <div class="section">
+    <div class="section-header">Authentication</div>
+    <div class="meta">Select authentication policy for incoming connections:</div>
+    <div class="switch-box">
+      <button class="switch-btn ${!authRequired ? "active" : ""}" data-auth="none">No Auth (Open)</button>
+      <button class="switch-btn ${authRequired ? "active" : ""}" data-auth="required">Require Auth (Tokens / OAuth)</button>
+    </div>
+    ${
+      !authRequired
+        ? `
+    <div class="notice-box open">
+      No Auth active. Direct connection enabled without tokens or authorization handshakes.
+    </div>
+    `
+        : `
+    <div class="notice-box protected">
+      Authentication active. Incoming requests must supply a valid OAuth 2.0 or bearer access token.
+    </div>
+    <div class="btn-row">
+      <button class="secondary" data-command="generateToken">Generate Token</button>
+    </div>
+    `
+    }
+  </div>
+
+  <!-- Section 3: Workspace Permissions -->
+  <div class="section">
+    <div class="section-header">
+      <span>Permissions</span>
       <div class="btn-row" style="margin:0;">
-        <button class="secondary" style="font-size:11.5px; padding:5px 10px;" data-command="allowAll">Allow All</button>
-        <button class="secondary" style="font-size:11.5px; padding:5px 10px;" data-command="developerPreset">Developer Preset</button>
-        <button class="secondary" style="font-size:11.5px; padding:5px 10px;" data-command="readOnlyPreset">Read-Only</button>
+        <button class="secondary" style="font-size:11px; padding:3px 8px;" data-command="allowAll">Allow All</button>
+        <button class="secondary" style="font-size:11px; padding:3px 8px;" data-command="developerPreset">Developer Preset</button>
+        <button class="secondary" style="font-size:11px; padding:3px 8px;" data-command="readOnlyPreset">Read-Only Preset</button>
       </div>
     </div>
-
+    <div class="meta">Click any permission card to toggle:</div>
     <div class="perm-grid">
-      ${permissionChip("Workspace Read", "Read workspace files & tree", permissions.workspaceRead, "workspaceRead")}
-      ${permissionChip("Workspace Search", "Ripgrep search in codebase", permissions.workspaceSearch, "workspaceSearch")}
-      ${permissionChip("Editor Read", "Inspect open tabs & cursors", permissions.editorRead, "editorRead")}
-      ${permissionChip("Editor Write", "Insert & edit in active editor", permissions.editorWrite, "editorWrite")}
-      ${permissionChip("File Write", "Create & modify project files", permissions.fileWrite, "fileWrite")}
-      ${permissionChip("File Delete", "Delete files in workspace", permissions.fileDelete, "fileDelete")}
-      ${permissionChip("Terminal", "Run shell commands in IDE", permissions.terminal, "terminal")}
-      ${permissionChip("Git Operations", "Git status, diff, commit, log", permissions.gitWrite, "gitWrite")}
-      ${permissionChip("Remote Access", "Allow external connections", permissions.remoteAccess, "remoteAccess")}
+      ${permissionCard("Workspace Read", "Read files and directories", permissions.workspaceRead, "workspaceRead")}
+      ${permissionCard("Workspace Search", "Ripgrep search across files", permissions.workspaceSearch, "workspaceSearch")}
+      ${permissionCard("Editor Read", "Read active document contents", permissions.editorRead, "editorRead")}
+      ${permissionCard("Editor Write", "Modify active document", permissions.editorWrite, "editorWrite")}
+      ${permissionCard("File Write", "Write or overwrite files", permissions.fileWrite, "fileWrite")}
+      ${permissionCard("File Delete", "Remove workspace files", permissions.fileDelete, "fileDelete")}
+      ${permissionCard("Terminal", "Execute commands in terminal", permissions.terminal, "terminal")}
+      ${permissionCard("Git Operations", "Git status, diff, commit", permissions.gitWrite, "gitWrite")}
+      ${permissionCard("Remote Access", "Permit non-local connections", permissions.remoteAccess, "remoteAccess")}
     </div>
   </div>
 
-  <!-- Card 4: How to Connect to Claude.ai Web -->
-  <div class="card">
-    <div class="card-title">
-      <span>🚀 Quick Connect Guide for Claude.ai Web</span>
-    </div>
-    <div class="guide-box">
-      <div class="guide-step">
-        <span class="step-num">1</span> Click <strong>Start Tunnel &amp; Copy Link</strong> above (or select <strong>🔓 No Auth</strong> mode).
-      </div>
-      <div class="guide-step">
-        <span class="step-num">2</span> Open <a href="https://claude.ai" target="_blank" style="color:var(--accent);">Claude.ai</a> &rarr; <strong>Settings</strong> &rarr; <strong>Integrations</strong> &rarr; <strong>Add MCP Server</strong>.
-      </div>
-      <div class="guide-step">
-        <span class="step-num">3</span> Paste your Tunnel URL: <code>${escapeHtml(tunnelMcp ?? "https://<your-tunnel>.trycloudflare.com/mcp")}</code>.
-      </div>
-      <div class="guide-step">
-        <span class="step-num">4</span> Claude links immediately to your VS Code workspace! Ask Claude to read, edit, or search your code!
-      </div>
-    </div>
-    <div class="btn-row" style="margin-top:16px;">
-      <button class="secondary" data-command="reloadWindow">🔄 Reload VS Code Window (Apply Updates)</button>
+  <!-- Section 4: Client Setup -->
+  <div class="section">
+    <div class="section-header">Client Setup</div>
+    <div class="guide-step">1. In your client (such as Claude.ai or Cursor), add MCP server with Streamable HTTP transport.</div>
+    <div class="guide-step">2. Set server URL to: <code>${escapeHtml(tunnelMcp ?? "http://127.0.0.1:32100/mcp")}</code></div>
+    <div class="guide-step">3. With <strong>No Auth</strong> selected, the connection establishes immediately without credentials.</div>
+    <div class="btn-row" style="margin-top:12px;">
+      <button class="secondary" data-command="reloadWindow">Reload Window</button>
     </div>
   </div>
 
@@ -523,7 +440,7 @@ function renderHtml(ctx: AppContext): string {
       });
     });
 
-    document.querySelectorAll(".auth-mode-btn").forEach((btn) => {
+    document.querySelectorAll(".switch-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
         const req = btn.getAttribute("data-auth") === "required";
         vscode.postMessage({ command: "setAuthRequired", required: req });

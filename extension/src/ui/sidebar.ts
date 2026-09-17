@@ -134,10 +134,10 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
     const escapeHtml = (value: string): string =>
       value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-    const permissionBadge = (label: string, allowed: boolean, permKey: PermissionKey): string =>
-      `<button class="perm-chip ${allowed ? "allowed" : "blocked"}" data-perm="${permKey}" title="Click to toggle ${escapeHtml(label)}">` +
-      `<span class="chip-status">${allowed ? "✓" : "✗"}</span>` +
-      `<span class="chip-label">${escapeHtml(label)}</span>` +
+    const permissionItem = (label: string, allowed: boolean, permKey: PermissionKey): string =>
+      `<button class="perm-btn ${allowed ? "active" : "inactive"}" data-perm="${permKey}" title="Toggle ${escapeHtml(label)}">` +
+      `<span class="perm-name">${escapeHtml(label)}</span>` +
+      `<span class="perm-state">${allowed ? "ON" : "OFF"}</span>` +
       `</button>`;
 
     return `<!DOCTYPE html>
@@ -147,70 +147,58 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>CodeLink</title>
 <style>
-  :root {
-    --card-bg: var(--vscode-editor-inactiveSelectionBackground, rgba(255,255,255,0.04));
-    --card-border: var(--vscode-widget-border, rgba(255,255,255,0.08));
-    --chip-pass-bg: #15803d;
-    --chip-pass-fg: #ffffff;
-  }
   body {
-    font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
-    font-size: var(--vscode-font-size, 13px);
+    font-family: var(--vscode-font-family, sans-serif);
+    font-size: var(--vscode-font-size, 12px);
     color: var(--vscode-foreground);
-    padding: 12px 14px;
+    padding: 10px 12px;
     margin: 0;
     box-sizing: border-box;
+    line-height: 1.4;
   }
-  h3 {
+  .section-title {
     font-size: 11px;
-    font-weight: 700;
+    font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.6px;
+    letter-spacing: 0.5px;
     color: var(--vscode-sideBarTitle-foreground, var(--vscode-descriptionForeground));
-    margin: 14px 0 6px 0;
+    margin: 12px 0 6px 0;
     display: flex;
     justify-content: space-between;
     align-items: center;
   }
-  .hint {
-    font-size: 10px;
-    font-weight: normal;
-    text-transform: none;
-    opacity: 0.75;
+  .box {
+    background: var(--vscode-editor-inactiveSelectionBackground, rgba(255,255,255,0.04));
+    border: 1px solid var(--vscode-widget-border, rgba(255,255,255,0.08));
+    border-radius: 4px;
+    padding: 8px 10px;
+    margin-bottom: 10px;
   }
-  .card {
-    background: var(--card-bg);
-    border: 1px solid var(--card-border);
-    border-radius: 6px;
-    padding: 10px 12px;
-    margin-bottom: 12px;
-  }
-  .status-row {
+  .status-line {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     font-weight: 600;
-    margin-bottom: 8px;
+    font-size: 12px;
   }
-  .dot {
-    width: 9px;
-    height: 9px;
+  .indicator {
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
     flex-shrink: 0;
   }
-  .dot.running {
+  .indicator.on {
     background: #22c55e;
-    box-shadow: 0 0 8px rgba(34,197,94,0.6);
   }
-  .dot.stopped {
+  .indicator.off {
     background: #94a3b8;
   }
-  .code-box {
-    background: var(--vscode-textCodeBlock-background, rgba(0,0,0,0.2));
-    border: 1px solid var(--card-border);
-    border-radius: 4px;
-    padding: 6px 8px;
-    font-family: var(--vscode-editor-font-family, monospace);
+  .code {
+    background: var(--vscode-textCodeBlock-background, rgba(0,0,0,0.25));
+    border: 1px solid var(--vscode-widget-border, rgba(255,255,255,0.08));
+    border-radius: 3px;
+    padding: 4px 6px;
+    font-family: var(--vscode-editor-font-family, Consolas, monospace);
     font-size: 11px;
     word-break: break-all;
     display: block;
@@ -219,24 +207,23 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
   }
   .btn-row {
     display: flex;
-    gap: 6px;
+    gap: 4px;
     flex-wrap: wrap;
-    margin-top: 8px;
+    margin-top: 6px;
   }
   button {
     flex: 1 1 auto;
-    min-width: 60px;
-    padding: 6px 10px;
+    padding: 5px 8px;
     border: none;
-    border-radius: 4px;
-    font-size: 12px;
+    border-radius: 3px;
+    font-size: 11.5px;
     font-weight: 500;
     background: var(--vscode-button-background);
     color: var(--vscode-button-foreground);
     cursor: pointer;
-    transition: all 0.15s ease;
     font-family: inherit;
     text-align: center;
+    transition: opacity 0.1s;
   }
   button:hover {
     background: var(--vscode-button-hoverBackground);
@@ -246,44 +233,41 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
     color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
   }
   button.secondary:hover {
-    background: var(--vscode-button-secondaryHoverBackground, rgba(255,255,255,0.15));
+    background: var(--vscode-button-secondaryHoverBackground, rgba(255,255,255,0.14));
   }
 
   /* Segmented Auth Selector */
-  .auth-mode-container {
+  .switch-group {
     display: flex;
-    background: var(--vscode-input-background, rgba(0,0,0,0.2));
-    border: 1px solid var(--card-border);
-    border-radius: 5px;
-    padding: 3px;
-    gap: 3px;
-    margin: 6px 0 8px 0;
+    background: var(--vscode-input-background, rgba(0,0,0,0.25));
+    border: 1px solid var(--vscode-widget-border, rgba(255,255,255,0.08));
+    border-radius: 4px;
+    padding: 2px;
+    gap: 2px;
+    margin: 6px 0;
   }
-  .auth-toggle-btn {
+  .switch-btn {
     flex: 1;
     padding: 5px 6px;
-    font-size: 11.5px;
+    font-size: 11px;
     font-weight: 600;
     border: none;
-    border-radius: 4px;
+    border-radius: 3px;
     cursor: pointer;
     background: transparent;
     color: var(--vscode-descriptionForeground);
-    transition: all 0.15s ease;
-    white-space: nowrap;
+    text-align: center;
   }
-  .auth-toggle-btn.active {
+  .switch-btn.active {
     background: var(--vscode-button-background);
     color: var(--vscode-button-foreground);
-    box-shadow: 0 1px 3px rgba(0,0,0,0.25);
   }
-  .auth-toggle-btn:not(.active):hover {
+  .switch-btn:not(.active):hover {
     background: rgba(255,255,255,0.05);
     color: var(--vscode-foreground);
   }
-  .auth-desc {
+  .desc {
     font-size: 11px;
-    line-height: 1.4;
     color: var(--vscode-descriptionForeground);
     margin-top: 4px;
   }
@@ -292,149 +276,137 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
   .perm-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 5px;
-    margin: 8px 0;
+    gap: 4px;
+    margin: 6px 0;
   }
-  .perm-chip {
-    padding: 6px 8px;
-    font-size: 11px;
-    font-weight: 500;
-    border-radius: 4px;
-    border: 1px solid var(--card-border);
-    cursor: pointer !important;
-    transition: all 0.15s ease;
-    display: inline-flex;
+  .perm-btn {
+    padding: 5px 8px;
+    border-radius: 3px;
+    border: 1px solid var(--vscode-widget-border, rgba(255,255,255,0.08));
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
     align-items: center;
-    gap: 5px;
-    user-select: none;
+    background: rgba(255,255,255,0.03);
+    color: var(--vscode-foreground);
     text-align: left;
     min-width: 0;
   }
-  .perm-chip:hover {
-    filter: brightness(1.2);
-    transform: translateY(-1px);
-  }
-  .perm-chip:active {
-    transform: translateY(0);
-  }
-  .perm-chip.allowed {
-    background: var(--chip-pass-bg);
-    color: var(--chip-pass-fg);
+  .perm-btn.active {
     border-color: #22c55e;
-    font-weight: 600;
+    background: rgba(34,197,94,0.12);
   }
-  .perm-chip.blocked {
-    background: rgba(255,255,255,0.03);
-    color: var(--vscode-descriptionForeground);
+  .perm-btn.inactive {
     border-style: dashed;
+    color: var(--vscode-descriptionForeground);
+    opacity: 0.8;
   }
-  .chip-status {
-    font-weight: 700;
+  .perm-name {
     font-size: 11px;
-  }
-  .chip-label {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .footer-links {
+  .perm-state {
+    font-size: 9.5px;
+    font-weight: 700;
+    margin-left: 4px;
+  }
+  .perm-btn.active .perm-state {
+    color: #22c55e;
+  }
+  .perm-btn.inactive .perm-state {
+    color: #94a3b8;
+  }
+  .footer {
     margin-top: 14px;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 5px;
   }
 </style>
 </head>
 <body>
-  <!-- MCP Server Status -->
-  <div class="card">
-    <div class="status-row">
-      <span class="dot ${running ? "running" : "stopped"}"></span>
-      <span>MCP Server: ${running ? "Running" : "Stopped"}</span>
+  <!-- MCP Server -->
+  <div class="section-title">Server</div>
+  <div class="box">
+    <div class="status-line">
+      <span class="indicator ${running ? "on" : "off"}"></span>
+      <span>${running ? "Running" : "Stopped"}</span>
     </div>
-    ${endpoint ? `<div style="font-size:10.5px; opacity:0.8;">Local Endpoint:</div><code class="code-box">${escapeHtml(endpoint)}</code>` : ""}
+    ${endpoint ? `<code class="code">${escapeHtml(endpoint)}</code>` : ""}
     <div class="btn-row">
-      ${!running ? `<button data-command="start">Start Server</button>` : `<button class="secondary" data-command="stop">Stop</button>`}
+      ${!running ? `<button data-command="start">Start</button>` : `<button class="secondary" data-command="stop">Stop</button>`}
       ${running ? `<button class="secondary" data-command="restart">Restart</button>` : ""}
     </div>
   </div>
 
   <!-- Cloudflare Tunnel -->
-  <div class="card">
-    <div class="status-row">
-      <span class="dot ${tunnelRunning ? "running" : "stopped"}"></span>
-      <span>Tunnel: ${tunnelRunning ? "Live" : "Stopped"}</span>
+  <div class="section-title">Cloudflare Tunnel</div>
+  <div class="box">
+    <div class="status-line">
+      <span class="indicator ${tunnelRunning ? "on" : "off"}"></span>
+      <span>${tunnelRunning ? "Active" : "Stopped"}</span>
     </div>
     ${
       tunnelRunning && tunnelUrl
         ? `
-    <div style="font-size: 10.5px; opacity:0.8;">Direct Web MCP Endpoint:</div>
-    <code class="code-box">${escapeHtml(tunnelUrl.endsWith("/") ? `${tunnelUrl}mcp` : `${tunnelUrl}/mcp`)}</code>
+    <code class="code">${escapeHtml(tunnelUrl.endsWith("/") ? `${tunnelUrl}mcp` : `${tunnelUrl}/mcp`)}</code>
     <div class="btn-row">
-      <button data-command="copyTunnelUrl">Copy Tunnel URL</button>
+      <button data-command="copyTunnelUrl">Copy URL</button>
       <button class="secondary" data-command="stopTunnel">Stop</button>
     </div>`
         : `
     <div class="btn-row">
-      <button data-command="startTunnel">Start Tunnel &amp; Copy Link</button>
+      <button data-command="startTunnel">Start Tunnel &amp; Copy URL</button>
     </div>`
     }
   </div>
 
-  <!-- Auth Mode Selection (User Requested: No Auth vs OAuth) -->
-  <h3>
-    <span>Auth Mode</span>
-    <span class="hint">${authRequired ? "🔒 Protected" : "🔓 Open Access"}</span>
-  </h3>
-  <div class="card" style="padding: 8px 10px;">
-    <div class="auth-mode-container">
-      <button class="auth-toggle-btn ${!authRequired ? "active" : ""}" data-auth="none">
-        🔓 No Auth
-      </button>
-      <button class="auth-toggle-btn ${authRequired ? "active" : ""}" data-auth="required">
-        🔒 OAuth / Auth
-      </button>
+  <!-- Authentication -->
+  <div class="section-title">Authentication</div>
+  <div class="box">
+    <div class="switch-group">
+      <button class="switch-btn ${!authRequired ? "active" : ""}" data-auth="none">No Auth</button>
+      <button class="switch-btn ${authRequired ? "active" : ""}" data-auth="required">Require Auth</button>
     </div>
-    <div class="auth-desc">
+    <div class="desc">
       ${
         !authRequired
-          ? `<strong>No Auth active:</strong> AI clients (Claude.ai Web, Cursor) connect directly with zero login prompts or token errors.`
-          : `<strong>OAuth active:</strong> Enforces RFC 8414 / 9728 OAuth discovery and bearer access tokens.`
+          ? "No Auth active. Direct connection without credentials."
+          : "Authentication required via OAuth 2.0 or bearer token."
       }
     </div>
     ${
       authRequired
         ? `
     <div class="btn-row" style="margin-top:6px;">
-      <button class="secondary" data-command="generateToken">Generate Access Token</button>
+      <button class="secondary" data-command="generateToken">Generate Token</button>
     </div>`
         : ""
     }
   </div>
 
-  <!-- Permissions Grid (Clickable) -->
-  <h3>
-    <span>Permissions</span>
-    <span class="hint">(click to toggle)</span>
-  </h3>
+  <!-- Permissions -->
+  <div class="section-title">Permissions</div>
   <div class="perm-grid">
-    ${permissionBadge("Read", permissions.workspaceRead, "workspaceRead")}
-    ${permissionBadge("Search", permissions.workspaceSearch, "workspaceSearch")}
-    ${permissionBadge("Editor", permissions.editorRead, "editorRead")}
-    ${permissionBadge("Edit", permissions.editorWrite, "editorWrite")}
-    ${permissionBadge("Write", permissions.fileWrite, "fileWrite")}
-    ${permissionBadge("Delete", permissions.fileDelete, "fileDelete")}
-    ${permissionBadge("Terminal", permissions.terminal, "terminal")}
-    ${permissionBadge("Git", permissions.gitWrite, "gitWrite")}
+    ${permissionItem("Read", permissions.workspaceRead, "workspaceRead")}
+    ${permissionItem("Search", permissions.workspaceSearch, "workspaceSearch")}
+    ${permissionItem("Editor", permissions.editorRead, "editorRead")}
+    ${permissionItem("Edit", permissions.editorWrite, "editorWrite")}
+    ${permissionItem("Write", permissions.fileWrite, "fileWrite")}
+    ${permissionItem("Delete", permissions.fileDelete, "fileDelete")}
+    ${permissionItem("Terminal", permissions.terminal, "terminal")}
+    ${permissionItem("Git", permissions.gitWrite, "gitWrite")}
   </div>
-  <div class="btn-row" style="margin-bottom: 12px;">
+  <div class="btn-row" style="margin-bottom: 8px;">
     <button class="secondary" style="font-size:11px;" data-command="allowAllPermissions">Allow All</button>
   </div>
 
   <!-- Footer Actions -->
-  <div class="footer-links">
-    <button class="secondary" data-command="openDashboard">Open Full Control Center ↗</button>
-    <button class="secondary" style="opacity:0.75; font-size:11px;" data-command="reloadWindow">Reload VS Code Window</button>
+  <div class="footer">
+    <button class="secondary" data-command="openDashboard">Open Control Center</button>
+    <button class="secondary" style="font-size:11px;" data-command="reloadWindow">Reload Window</button>
   </div>
 
   <script>
@@ -446,7 +418,7 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
       });
     });
 
-    document.querySelectorAll(".perm-chip").forEach((btn) => {
+    document.querySelectorAll(".perm-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
         const perm = btn.getAttribute("data-perm");
         if (perm) {
@@ -455,7 +427,7 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
       });
     });
 
-    document.querySelectorAll(".auth-toggle-btn").forEach((btn) => {
+    document.querySelectorAll(".switch-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
         const req = btn.getAttribute("data-auth") === "required";
         vscode.postMessage({ command: "setAuthRequired", required: req });
