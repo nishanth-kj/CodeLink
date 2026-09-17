@@ -103,6 +103,11 @@
           "default": false,
           "description": "Allow the MCP server to bind to a non-loopback host and accept authenticated remote connections. Disabled by default."
         },
+        "codelink.security.allowSecretFileAccess": {
+          "type": "boolean",
+          "default": false,
+          "description": "Allow tools to read files that look like secrets (.env, private keys, credential files). Disabled by default; this is defense-in-depth, not a complete secret scanner."
+        },
         "codelink.files.excludePatterns": {
           "type": "array",
           "items": { "type": "string" },
@@ -202,7 +207,7 @@
     "@vscode/test-electron": "^2.5.2",
     "@vscode/vsce": "^3.1.0",
     "eslint": "^9.0.0",
-    "mocha": "^10.10.0",
+    "mocha": "^10.2.0",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"
   }
