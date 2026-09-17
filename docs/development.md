@@ -12,7 +12,7 @@
 ```bash
 git clone https://github.com/nishanth-kj/CodeLink
 cd CodeLink
-npm install                # installs extension/'s deps (npm workspaces; run from the repo root)
+npm install --prefix extension   # extension/ is a standalone npm project, not a workspace
 cargo build --manifest-path core/Cargo.toml
 ```
 
@@ -36,6 +36,8 @@ Tests are split by what they need to run:
 | `extension/test/suite/*.test.ts` | `@vscode/test-electron` + Mocha | Tests needing the real VS Code API (`vscode.*`), run inside an actual extension host — see below. |
 
 Run everything together with `npm test` from the repo root (type-checks `tests/` against `extension/src`, then runs vitest, then `cargo test`), or individually: `npm run typecheck:tests`, `npm run test:extension` (vitest only), `npm run test:core` (cargo only), or `cargo test` / `npx vitest run` directly from `core/` / `extension/`. Note that vitest transpiles test files without type-checking them (esbuild, transpile-only) — `npm run typecheck:tests` is what actually catches a type error in `tests/**/*.ts`, since it runs `tsc --noEmit` against that directory using the extension's real source types.
+
+`typecheck:tests` first runs `scripts/link-test-node-modules.mjs`, which creates `tests/node_modules` as a symlink to `extension/node_modules` (a Windows junction, needing no elevated privileges, or a plain symlink on POSIX) if it doesn't already exist. `tests/**/*.ts` imports `vitest` and `@modelcontextprotocol/sdk` directly, and since `tests/` isn't part of the `extension/` npm project, those packages otherwise aren't reachable from a plain ancestor-directory walk — real resolution through the symlink (rather than a tsconfig `paths` override) is what's needed, since `paths` bypasses a package's `exports` map and breaks on subpath imports like `@modelcontextprotocol/sdk/client/index.js`.
 
 ### Why `tests/integration` can load `vscode`-importing modules without a real extension host
 
@@ -68,12 +70,14 @@ cargo clippy --manifest-path core/Cargo.toml --all-targets -- -D warnings
 ## Packaging
 
 ```bash
-npm run build:core --workspace-root      # or: cargo build --release --manifest-path core/Cargo.toml
-npm run build                            # tsc, from repo root or extension/
-cd extension && npm run package          # vsce package -o ../codelink.vsix
+npm run build:core     # cargo build --release --manifest-path core/Cargo.toml
+npm run build           # tsc (from the repo root; delegates to extension/)
+npm run package          # vsce package -o codelink.vsix (from the repo root; delegates to extension/)
 ```
 
-`vsce package` bundles `extension/`'s compiled output and its production `node_modules` (no `--no-dependencies` flag — `@modelcontextprotocol/sdk` and `zod` are real runtime dependencies, not bundled via esbuild). It does **not** currently bundle a Rust binary into the `.vsix` automatically; see "Cross-platform binaries" below.
+This produces `codelink.vsix` (a few MB — `extension/`'s compiled output, `LICENSE`, `README.md`, and its production `node_modules`; no `--no-dependencies` flag, since `@modelcontextprotocol/sdk` and `zod` are real runtime dependencies, not bundled via esbuild). It does **not** currently bundle a Rust binary into the `.vsix` automatically; see "Cross-platform binaries" below.
+
+**`extension/` is a standalone npm project, not an npm workspace**, specifically because of how `vsce package` discovers files: it runs `npm list --production --parseable --depth=99999` from the package directory to find dependency folders to include, and in a workspaces monorepo that walk resolves the workspace root itself as a "dependency" — which made `vsce` try to glob the *entire repository* (including `core/target`'s multi-hundred-MB build output) into the VSIX, and then fail outright on a path that climbed outside the accepted package root. If you're tempted to reintroduce `"workspaces": ["extension"]` in the root `package.json` for convenience, check that `vsce package` still produces a small, sane VSIX afterward (`vsce ls --tree` from `extension/` shows exactly what would be included).
 
 ## Cross-platform binaries
 

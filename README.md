@@ -49,10 +49,10 @@ CodeLink is not yet published to the VS Code Marketplace; install it from a buil
 ```bash
 git clone https://github.com/nishanth-kj/CodeLink
 cd CodeLink
-npm install
-npm run build:core     # builds core/target/release/codelink-core (requires a Rust toolchain)
-npm run build          # compiles the extension to extension/out
-npm run package        # produces extension/../codelink.vsix
+npm install --prefix extension   # extension/ is a standalone npm project
+npm run build:core               # builds core/target/release/codelink-core (requires a Rust toolchain)
+npm run build                    # compiles the extension to extension/out
+npm run package                  # produces codelink.vsix in the repo root
 ```
 
 Then in VS Code: **Extensions → ⋯ → Install from VSIX…** and select `codelink.vsix`.
@@ -107,7 +107,7 @@ Full details, including the path-validation and secret-filtering design, live in
 ## Development
 
 ```bash
-npm install                 # installs the extension's npm dependencies (npm workspaces)
+npm install --prefix extension   # extension/ is a standalone npm project, not a workspace
 npm run build:core          # cargo build --release (core/)
 npm run build               # tsc (extension/)
 npm test                    # extension unit/integration tests (vitest) + core tests (cargo test)
