@@ -27,7 +27,7 @@ Open the repository root in VS Code and use the **Run CodeLink Extension** launc
 Tests are split by what they need to run:
 
 | Location | Runner | What it covers |
-|---|---|---|
+| --- | --- | --- |
 | `core/src/**/*.rs` (`#[cfg(test)]`) | `cargo test` | Unit tests for each Rust module — path security, filesystem, search, process, Git. |
 | `core/tests/ipc_integration.rs` | `cargo test` | End-to-end tests against the real compiled `codelink-core` binary over its actual stdio protocol. |
 | `tests/security/*.test.ts` | `vitest` (via `extension/vitest.config.ts`) | Pure-logic unit tests for the security layer — no `vscode`, no real process. |

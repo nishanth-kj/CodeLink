@@ -22,19 +22,19 @@
       "label": "core: build",
       "type": "shell",
       "command": "cargo build --manifest-path core/Cargo.toml",
-      "problemMatcher": ["$rustc"]
+      "problemMatcher": []
     },
     {
       "label": "core: build (release)",
       "type": "shell",
       "command": "cargo build --release --manifest-path core/Cargo.toml",
-      "problemMatcher": ["$rustc"]
+      "problemMatcher": []
     },
     {
       "label": "core: test",
       "type": "shell",
       "command": "cargo test --manifest-path core/Cargo.toml",
-      "problemMatcher": ["$rustc"]
+      "problemMatcher": []
     }
   ]
 }

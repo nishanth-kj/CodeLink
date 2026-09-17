@@ -1,6 +1,6 @@
 {
-  "typescript.tsdk": "extension/node_modules/typescript/lib",
-  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "js/ts.tsdk.path": "extension/node_modules/typescript/lib",
+  "js/ts.tsdk.promptToUseWorkspaceVersion": true,
   "files.exclude": {
     "**/out": true,
     "**/dist": true,
@@ -13,9 +13,6 @@
     "**/node_modules": true
   },
   "editor.formatOnSave": true,
-  "[rust]": {
-    "editor.defaultFormatter": "rust-lang.rust-analyzer"
-  },
   "rust-analyzer.linkedProjects": [
     "core/Cargo.toml"
   ]
