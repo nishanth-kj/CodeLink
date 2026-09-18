@@ -1,13 +1,12 @@
 # Architecture
 
-## Why two languages
+## One runtime, one process
 
-CodeLink is deliberately split across two runtimes, each doing the part it is suited for:
+CodeLink runs entirely as a TypeScript VS Code extension. `extension/src/` owns everything: the MCP server and transport, the security/permission layer, VS Code API integration (editor, diagnostics, commands, UI), configuration, and the local core — the operating-system-facing work (reading and writing files, walking directories, searching file contents, spawning and tracking child processes, shelling out to `git`).
 
-- **TypeScript** (`extension/`) owns everything that has to run inside the VS Code extension host: the MCP server and transport, the security/permission layer, VS Code API integration (editor, diagnostics, commands, UI), configuration, and the Rust process's lifecycle.
-- **Rust** (`core/`) owns the operating-system-facing work: reading and writing files, walking directories, searching file contents, spawning and tracking child processes, and shelling out to `git`. None of this needs the VS Code API, and doing it in Rust means workspace-boundary and symlink-escape checks happen in a language built for exactly that kind of correctness, with a real test suite around it.
+`tools/filesystem.ts`, `tools/terminal.ts`, and `tools/git.ts` never touch the filesystem or spawn a process directly — every call goes through `CoreBridge`, a single `call(method, params)` chokepoint (`extension/src/core/bridge.ts`) that dispatches in-process to the modules under `extension/src/core/`. Editor and diagnostics tools instead talk to the VS Code API directly, because that state only exists inside the extension host.
 
-Neither side re-implements the other's job. `tools/filesystem.ts`, `tools/terminal.ts`, and `tools/git.ts` never touch the filesystem or spawn a process directly — every call goes through `RustBridge`. Conversely, nothing in `core/` knows what a `vscode.TextEditor` is; editor and diagnostics tools talk to the VS Code API directly in TypeScript, because that state only exists inside the extension host.
+> The repository also contains a standalone Rust implementation of the same core, `core/`, kept around but **not used by the extension**. See "The `core/` Rust crate" below.
 
 ## End-to-end request flow
 
@@ -34,18 +33,18 @@ Tool handler (extension/src/tools/*.ts)
     ▼
    ┌───────────────┴───────────────┐
    ▼                               ▼
-RustBridge.call(method, params)   VS Code API
+CoreBridge.call(method, params)   VS Code API
    │  (filesystem/search/         (editor, diagnostics,
    │   process/git tools)          workspace metadata)
    ▼
-codelink-core over JSON IPC (stdio)
+extension/src/core/dispatch.ts
    │  6. WorkspaceGuard re-validates the path (symlink-safe,
    │     defense in depth — never trusts its caller)
    ▼
 Real filesystem / process / git operation
    │
    ▼
-Structured {success, result} or {success, error} response
+Result value, or a thrown CodeLinkError
    │
    ▼
 MCP CallToolResult (content + isError) ──▶ back up the stack to the client
@@ -53,49 +52,26 @@ MCP CallToolResult (content + isError) ──▶ back up the stack to the client
 
 Steps 1–2 happen once per HTTP request, before MCP routing even begins — an unauthenticated or rate-limited request never reaches tool dispatch. Steps 3–5 happen once per tool call, inside the wrapper every registered tool goes through (`bindTool`), so no individual tool can skip them by omission. See [security.md](security.md) for the full pipeline rationale and [mcp.md](mcp.md) for the MCP-specific details.
 
-## The Rust core (`core/`)
+## The local core (`extension/src/core/`)
 
-`codelink-core` is a single binary, `codelink-core[.exe]`, built by `cargo build --release`. It has no network listener and no CLI arguments; it is spawned by the extension as a child process and speaks a small JSON protocol over its stdin/stdout (see below). Its modules:
+There is no separate process and no IPC: `CoreBridge` dispatches a method name straight to a function call in the same Node.js process the rest of the extension runs in. Its modules:
 
 | Module | Responsibility |
 | --- | --- |
-| `security.rs` | `WorkspaceGuard`: the authoritative path-containment check (traversal, absolute paths, symlink escapes, null bytes) that every other module routes through. |
-| `filesystem.rs` | read / write / delete / move / copy / list / exists, with size limits and exclude-glob filtering. |
-| `search.rs` | Text search with timeout, cancellation, result limits, and per-file size limits. |
-| `process.rs` | Spawns and tracks child processes (used by the terminal tools): output capture with a size cap, a watchdog thread enforcing timeouts, and environment filtering that drops anything that looks like a credential while preserving `PATH`. |
-| `git.rs` | Read-only Git operations, each a fixed `git` argv — a client-supplied string is never interpolated into a shell command. |
-| `watcher.rs` | An optional recursive file watcher that emits `workspace.fileChanged` notifications on stdout alongside normal responses. |
-| `protocol.rs` | The wire format (`Request`/`Response`/`Notification`) and the single mutex-guarded stdout writer that keeps concurrent responses from interleaving. |
+| `workspaceGuard.ts` | `WorkspaceGuard`: the authoritative path-containment check (traversal, absolute paths, symlink escapes, null bytes) that every other module routes through. |
+| `filesystem.ts` | read / write / delete / move / copy / list / exists, with size limits and exclude-glob filtering. |
+| `search.ts` | Text search with timeout, cancellation, result limits, and per-file size limits. |
+| `process.ts` | Spawns and tracks child processes (used by the terminal tools): output capture with a size cap, a per-process timeout, and environment filtering that drops anything that looks like a credential while preserving `PATH`. |
+| `git.ts` | Read-only Git operations, each a fixed `git` argv passed to `execFile` — a client-supplied string is never interpolated into a shell command. |
+| `watcher.ts` | An optional recursive file watcher that emits `workspace.fileChanged` notifications alongside normal responses. |
+| `glob.ts`, `walk.ts` | A small self-contained glob matcher (`*`, `**`, `?`) and the shared directory walker `filesystem.list` and `search.text` both use. |
+| `cancellation.ts`, `dispatch.ts`, `bridge.ts` | Per-request cancellation flags, the method-name-to-handler routing table, and the `call()`/`start()`/`stop()` chokepoint every tool goes through. |
 
-## The JSON IPC protocol
+`dispatch.ts` is the only place method names are mapped to handlers, keeping the full surface of what a tool can ask the local core to do visible in one place — the direct equivalent of what `core/src/lib.rs`'s `dispatch()` used to be for the Rust core.
 
-One JSON object per line, in both directions. stdout is reserved exclusively for protocol messages; every Rust-side log line goes to stderr instead (the extension forwards it at `debug` level).
+`CoreBridge.call(method, params, timeoutMs?)` generates a request id, races the dispatched call against a timeout, and on timeout marks that id cancelled (checked cooperatively inside `search.text`, the only long-running handler) before rejecting with `REQUEST_TIMEOUT`. It also fans out `workspace.fileChanged` notifications to subscribers via `onNotification()`. `start()`/`stop()`/`isRunning()` remain a real gate — calls made before the first `start()` or after `stop()` are rejected — even though there is no child process to actually start or stop, so a caller that forgets to start it still fails loudly instead of silently succeeding.
 
-Request (TypeScript → Rust):
-
-```json
-{ "id": "a1b2c3", "method": "filesystem.read", "params": { "root": "/workspace", "path": "src/app.ts" } }
-```
-
-Success response:
-
-```json
-{ "id": "a1b2c3", "success": true, "result": { "path": "src/app.ts", "content": "...", "encoding": "utf8", "size": 512 } }
-```
-
-Error response:
-
-```json
-{ "id": "a1b2c3", "success": false, "error": { "code": "PATH_OUTSIDE_WORKSPACE", "message": "..." } }
-```
-
-Notification (Rust → TypeScript, no `id`, currently only the file watcher):
-
-```json
-{ "method": "workspace.fileChanged", "params": { "watchId": "default", "path": "src/app.ts", "kind": "modified" } }
-```
-
-`extension/src/rust/process.ts` owns the child process (spawn, line-buffered stdout parsing, stderr forwarding, exit handling); `extension/src/rust/bridge.ts` layers request/response correlation, per-request timeouts with best-effort cancellation (`system.cancel`), and notification fan-out on top of it. Every filesystem/search/process/git tool calls `RustBridge.call(method, params)` rather than talking to the child process directly.
+Unlike the Rust core (which used the `ignore` crate to walk a directory tree honoring `.gitignore`), the local core's walker only ever applies the explicit `codelink.files.excludePatterns` glob list — it does not read `.gitignore` files. In practice this rarely matters, since the default exclude patterns already cover `.git`, `node_modules`, `target`, `dist`, and `build`.
 
 ## MCP transport: why Streamable HTTP, and why a bare `node:http` server
 
@@ -112,7 +88,11 @@ See the top-level file tree in the repository for the full layout; the short ver
 - `extension/src/mcp/` — the MCP server, transport, session tracking, and shared protocol helpers.
 - `extension/src/tools/`, `extension/src/resources/` — one file per tool/resource category, each exporting a plain array built with `defineTool`/`defineResource`.
 - `extension/src/security/` — `PermissionManager`, `AuthenticationManager`, `RateLimiter`, `SecurityPolicy`, plus the standalone `pathValidator`/`secretFilter` functions.
-- `extension/src/rust/` — the IPC bridge described above.
+- `extension/src/core/` — the local core described above.
 - `extension/src/tunnel/` — the optional Cloudflare quick-tunnel.
 - `extension/src/ui/`, `extension/src/commands/` — status bar, dashboard, and the Command Palette commands.
 - `extension/src/config/` — the typed configuration schema, its VS Code-backed loader, and the hard-coded local-only default.
+
+## The `core/` Rust crate
+
+`core/` is a standalone, self-contained Rust implementation of the same filesystem/search/process/Git core, communicating over a line-delimited JSON protocol on stdio (see its own `README.md` and `core/src/lib.rs`'s `dispatch()`). It predates the TypeScript local core described above and is kept in the repository — buildable and independently tested via `cargo test` — but nothing under `extension/` imports, spawns, or otherwise depends on it. Treat it as a reference implementation, not part of the running extension.

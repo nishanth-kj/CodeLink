@@ -27,20 +27,22 @@ Every tool call passes through the same sequence of checks, in the same order, r
 4. Inside the handler, for any path argument:
      - workspace-boundary check (pathValidator.ts, filesystem-free, fast)
      - secret-filename check (secretFilter.ts), unless explicitly allowed
-5. Rust re-validates the path itself (WorkspaceGuard, symlink-safe) before
-   touching disk — Rust never trusts its caller, even its own extension host
+5. The local core re-validates the path itself (WorkspaceGuard, symlink-safe)
+   before touching disk — it never trusts its caller, even the rest of the
+   same extension
 6. Output limits (max read/write bytes, max search results, max terminal
-   output) are enforced by codelink-core, not by the TypeScript layer
+   output) are enforced inside the local core (extension/src/core/), not by
+   the tool handler
 ```
 
 ## Path validation
 
 Two independent checks exist, deliberately not merged into one:
 
-- **`security/pathValidator.ts`** runs first, in TypeScript, without touching the filesystem. It normalizes the path, rejects null bytes, and rejects anything that resolves outside the workspace root — catching `../../etc/passwd`-style traversal and absolute paths cheaply, before a request ever reaches Rust.
-- **`core/src/security.rs`'s `WorkspaceGuard`** is the authoritative check, because it's the one that can see the real filesystem. It normalizes lexically, then walks up from the target to the longest *existing* ancestor and canonicalizes that ancestor — which is what catches a symlink inside the workspace that points outside it, even for a path that doesn't exist yet (e.g. a file about to be created inside a symlinked directory).
+- **`security/pathValidator.ts`** runs first, without touching the filesystem. It normalizes the path, rejects null bytes, and rejects anything that resolves outside the workspace root — catching `../../etc/passwd`-style traversal and absolute paths cheaply, before a request ever reaches the local core.
+- **`extension/src/core/workspaceGuard.ts`'s `WorkspaceGuard`** is the authoritative check, because it's the one that can see the real filesystem. It normalizes lexically, then walks up from the target to the longest *existing* ancestor and canonicalizes that ancestor (`fs.promises.realpath`) — which is what catches a symlink inside the workspace that points outside it, even for a path that doesn't exist yet (e.g. a file about to be created inside a symlinked directory).
 
-Both checks return the same `PATH_OUTSIDE_WORKSPACE` error code. The Rust check is exercised by unit tests covering `../` traversal, absolute paths (including Windows drive letters and the workspace-root-as-string-prefix edge case, e.g. `/workspace/project` vs `/workspace/project-evil`), and a real symlink escape (on Unix; Windows symlink creation requires elevated privileges in most CI environments, so that specific test is `#[cfg(unix)]`).
+Both checks return the same `PATH_OUTSIDE_WORKSPACE` error code.
 
 ## Secret filtering
 
@@ -73,27 +75,26 @@ Section 16 of the original design intentionally scoped Git support to read-only 
 
 Terminal access (`terminal_create`/`terminal_run`/`terminal_output`/`terminal_kill`/`terminal_list`) is off by default in every profile except `trusted`. When enabled:
 
-- Every spawned process's environment starts from `codelink-core`'s own inherited environment (so `PATH` still resolves `git`, `npm`, etc.) with any variable whose name contains `API_KEY`, `TOKEN`, `PASSWORD`, `SECRET`, `PRIVATE_KEY`, `CREDENTIAL`, or that starts with `AWS_`, stripped out — see `core/src/process.rs`'s `is_sensitive_env_key`. Explicit overrides passed by the caller still win.
-- `codelink.terminal.timeoutMs` bounds how long a process may run before a watchdog thread kills it (reported as status `"timedout"`).
+- Every spawned process's environment starts from the extension host's own inherited environment (so `PATH` still resolves `git`, `npm`, etc.) with any variable whose name contains `API_KEY`, `TOKEN`, `PASSWORD`, `SECRET`, `PRIVATE_KEY`, `CREDENTIAL`, or that starts with `AWS_`, stripped out — see `extension/src/core/process.ts`'s `isSensitiveEnvKey`. Explicit overrides passed by the caller still win.
+- `codelink.terminal.timeoutMs` bounds how long a process may run before it is killed (reported as status `"timedout"`).
 - `codelink.terminal.maxOutputBytes` caps captured stdout/stderr; output beyond the cap is dropped and the result is marked `truncated: true` rather than growing unbounded.
 - Every process is tracked (id, command, args, cwd, start time, status, exit code) via `terminal_list`.
 
-A client never supplies a raw shell command string; `command` and `args` are passed straight to `std::process::Command`, never through a shell.
+A client never supplies a raw shell command string; `command` and `args` are passed straight to Node's `child_process.spawn`, never through a shell.
 
 ## Resource limits
 
-Enforced in `codelink-core`, not just documented as intentions:
+Enforced in the local core (`extension/src/core/`), not just documented as intentions:
 
 | Limit | Setting | Enforced in |
 | --- | --- | --- |
-| Max file read size | `codelink.files.maxReadBytes` | `filesystem::read` → `FILE_TOO_LARGE` |
-| Max file write size | `codelink.files.maxWriteBytes` | `filesystem::write` → `FILE_TOO_LARGE` |
-| Max search results | `codelink.search.maxResults` | `search::text` (`truncated: true` past the cap) |
-| Max file size searched | `codelink.search.maxFileSize` | `search::text` (file skipped, not searched) |
-| Search timeout | `codelink.search.timeoutMs` | `search::text` (`timedOut: true`, cancellable mid-scan) |
-| Terminal output cap | `codelink.terminal.maxOutputBytes` | `process::spawn`'s reader threads |
-| Terminal timeout | `codelink.terminal.timeoutMs` | `process::spawn`'s watchdog thread |
-| Max IPC message size | fixed, 64 MiB | `core/src/protocol.rs::MAX_MESSAGE_BYTES` |
+| Max file read size | `codelink.files.maxReadBytes` | `filesystem.read` → `FILE_TOO_LARGE` |
+| Max file write size | `codelink.files.maxWriteBytes` | `filesystem.write` → `FILE_TOO_LARGE` |
+| Max search results | `codelink.search.maxResults` | `search.text` (`truncated: true` past the cap) |
+| Max file size searched | `codelink.search.maxFileSize` | `search.text` (file skipped, not searched) |
+| Search timeout | `codelink.search.timeoutMs` | `search.text` (`timedOut: true`, cancellable mid-scan) |
+| Terminal output cap | `codelink.terminal.maxOutputBytes` | `process.spawnProcess`'s output listeners |
+| Terminal timeout | `codelink.terminal.timeoutMs` | `process.spawnProcess`'s timeout |
 
 ## Rate limiting
 
@@ -106,5 +107,6 @@ Structured logs go through `utils/logger.ts` to the "CodeLink" output channel. A
 ## Known limitations
 
 - Secret filtering is filename-pattern based, not content-scanning; see above.
-- `git.rs`'s shelled-out commands run without an explicit timeout (unlike terminal-tool processes) — a hung `git` process (e.g. blocked on a credential prompt) would block that one IPC request's thread, not the whole server, since each request runs on its own OS thread, but it would not be automatically killed.
+- `core/git.ts`'s shelled-out commands run without an explicit timeout (unlike terminal-tool processes) — a hung `git` process (e.g. blocked on a credential prompt) would leave that one `call()` unresolved until its own timeout/backstop fires, but it would not be automatically killed.
+- The local core's directory walker (used by `file_list`/`workspace_files`/`workspace_search`) only applies the explicit `codelink.files.excludePatterns` glob list; unlike the retired Rust core, it does not read `.gitignore` files.
 - Rate limiting is in-memory and per-process; it resets on server restart and does not persist across the extension being reloaded.

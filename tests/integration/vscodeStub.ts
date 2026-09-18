@@ -4,7 +4,7 @@
  * files, mcp/server.ts by extension) can be loaded outside the real VS
  * Code extension host, where no such module exists on disk.
  *
- * This suite mostly exercises tools that talk to codelink-core directly
+ * This suite mostly exercises tools backed by the local core directly
  * (filesystem, terminal, git) rather than real VS Code state — coverage
  * for the VS Code-API-backed tools (editor, diagnostics, symbol search)
  * lives in extension/test, which runs inside a real extension host via

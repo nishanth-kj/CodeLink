@@ -1,6 +1,6 @@
 import type { z } from "zod";
 import type { CodeLinkConfig } from "../config/schema.js";
-import type { RustBridge } from "../rust/bridge.js";
+import type { CoreBridge } from "../core/bridge.js";
 import type { PermissionKey } from "../security/permissions.js";
 import type { SecurityPolicy } from "../security/policy.js";
 import { CodeLinkError } from "../utils/errors.js";
@@ -11,7 +11,7 @@ import type { Logger } from "../utils/logger.js";
 export interface ToolContext {
   workspaceRoot: string;
   workspaceName: string;
-  bridge: RustBridge;
+  bridge: CoreBridge;
   getConfig: () => CodeLinkConfig;
   logger: Logger;
 }

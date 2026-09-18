@@ -1,3 +1,4 @@
+
 src/**
 test/**
 out-test/**
@@ -8,3 +9,18 @@ eslint.config.js
 **/*.ts
 .gitignore
 **/tsconfig.tsbuildinfo
+bin/**
+**/node_modules/**/*.d.ts
+**/node_modules/**/*.map
+**/node_modules/**/README*
+**/node_modules/**/readme*
+**/node_modules/**/CHANGELOG*
+**/node_modules/**/changelog*
+**/node_modules/**/test/**
+**/node_modules/**/tests/**
+**/node_modules/**/.github/**
+**/node_modules/**/example/**
+**/node_modules/**/examples/**
+**/node_modules/**/.eslintrc*
+**/node_modules/**/.nycrc*
+**/node_modules/**/tsconfig*.json

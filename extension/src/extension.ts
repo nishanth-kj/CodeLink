@@ -15,8 +15,8 @@ import { stopServer } from "./commands/stopServer.js";
 import { stopTunnel } from "./commands/stopTunnel.js";
 import { loadConfig, onConfigChanged } from "./config/configuration.js";
 import type { CodeLinkConfig } from "./config/schema.js";
+import { CoreBridge } from "./core/bridge.js";
 import { McpServerManager } from "./mcp/server.js";
-import { RustBridge } from "./rust/bridge.js";
 import { AuthenticationManager } from "./security/authentication.js";
 import { PermissionManager } from "./security/permissions.js";
 import { SecurityPolicy } from "./security/policy.js";
@@ -36,7 +36,7 @@ export interface AppContext {
   workspaceRoot: string;
   workspaceName: string;
   logger: Logger;
-  bridge: RustBridge;
+  bridge: CoreBridge;
   mcpServer: McpServerManager;
   permissions: PermissionManager;
   authentication: AuthenticationManager;
@@ -78,7 +78,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const workspaceRoot = workspaceFolder.uri.fsPath;
   const workspaceName = workspaceFolder.name;
 
-  const bridge = new RustBridge({ extensionRoot: context.extensionPath, workspaceRoot, logger });
+  const bridge = new CoreBridge({
+    logger,
+    extensionVersion: (context.extension.packageJSON as { version?: string }).version ?? "0.0.0",
+  });
   const permissions = new PermissionManager(getConfig);
   const authentication = new AuthenticationManager(context.secrets);
   const rateLimiter = new RateLimiter(
