@@ -3,6 +3,7 @@ import type { CodeLinkConfig } from "../config/schema.js";
 import type { CoreBridge } from "../core/bridge.js";
 import type { PermissionKey } from "../security/permissions.js";
 import type { SecurityPolicy } from "../security/policy.js";
+import type { ActivityLog } from "../utils/activityLog.js";
 import { CodeLinkError } from "../utils/errors.js";
 import type { Logger } from "../utils/logger.js";
 
@@ -12,6 +13,7 @@ export interface ToolContext {
   workspaceRoot: string;
   workspaceName: string;
   bridge: CoreBridge;
+  activityLog: ActivityLog;
   getConfig: () => CodeLinkConfig;
   logger: Logger;
 }
@@ -84,21 +86,54 @@ export function defineTool<Shape extends z.ZodRawShape>(definition: {
 export function bindTool(tool: RegisteredTool, ctx: ToolContext, policy: SecurityPolicy) {
   return async (args: unknown, extra: { sessionId?: string }): Promise<ToolResult> => {
     const clientId = extra.sessionId ?? "local";
+    const startedAt = Date.now();
     try {
       if (tool.permission) {
         policy.checkPermission(tool.permission);
       }
       const release = policy.acquireConcurrency(clientId);
+      let result: ToolResult;
       try {
-        return await tool.handler(args as never, ctx);
+        result = await tool.handler(args as never, ctx);
       } finally {
         release();
       }
+      ctx.activityLog.record({
+        tool: tool.name,
+        permission: tool.permission,
+        outcome: result.isError ? "error" : "success",
+        code: result.isError ? extractErrorCode(result) : undefined,
+        clientId,
+        durationMs: Date.now() - startedAt,
+      });
+      return result;
     } catch (error) {
       ctx.logger.debug(`Tool '${tool.name}' failed`, {
         error: error instanceof Error ? error.message : String(error),
       });
+      const code = CodeLinkError.isCodeLinkError(error) ? error.code : undefined;
+      ctx.activityLog.record({
+        tool: tool.name,
+        permission: tool.permission,
+        outcome: code?.endsWith("_DISABLED") || code === "PERMISSION_DENIED" ? "denied" : "error",
+        code,
+        clientId,
+        durationMs: Date.now() - startedAt,
+      });
       return errorResult(error);
     }
   };
+}
+
+function extractErrorCode(result: ToolResult): string | undefined {
+  const text = result.content[0]?.text;
+  if (!text) {
+    return undefined;
+  }
+  try {
+    const parsed = JSON.parse(text) as { code?: string };
+    return parsed.code;
+  } catch {
+    return undefined;
+  }
 }

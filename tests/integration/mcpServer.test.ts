@@ -12,11 +12,13 @@ import { AuthenticationManager, InMemorySecretStore } from "../../extension/src/
 import { PermissionManager } from "../../extension/src/security/permissions.js";
 import { SecurityPolicy } from "../../extension/src/security/policy.js";
 import { RateLimiter } from "../../extension/src/security/rateLimiter.js";
+import { ActivityLog } from "../../extension/src/utils/activityLog.js";
 import { ConsoleSink, Logger } from "../../extension/src/utils/logger.js";
 
 interface Harness {
   bridge: CoreBridge;
   mcpServer: McpServerManager;
+  activityLog: ActivityLog;
   authentication: AuthenticationManager;
   workspaceRoot: string;
   address: McpServerAddress;
@@ -47,11 +49,13 @@ async function startHarness(overrides: Partial<CodeLinkConfig>, port: number): P
   const rateLimiter = new RateLimiter(config.rateLimit.requestsPerMinute, config.rateLimit.maxConcurrentRequests);
   const policy = new SecurityPolicy(permissions, authentication, rateLimiter, () => config, logger);
 
+  const activityLog = new ActivityLog();
   const mcpServer = new McpServerManager({
     extensionVersion: "0.0.0-test",
     workspaceRoot,
     workspaceName: "integration-test-workspace",
     bridge,
+    activityLog,
     policy,
     getConfig: () => config,
     logger,
@@ -59,7 +63,7 @@ async function startHarness(overrides: Partial<CodeLinkConfig>, port: number): P
 
   try {
     const address = await mcpServer.start();
-    return { bridge, mcpServer, authentication, workspaceRoot, address };
+    return { bridge, mcpServer, activityLog, authentication, workspaceRoot, address };
   } catch (error) {
     await bridge.stop();
     fs.rmSync(workspaceRoot, { recursive: true, force: true });
@@ -151,6 +155,17 @@ describe("MCP server end-to-end (real local core, real MCP client)", () => {
     await client.close();
   });
 
+  it("records a successful tool call in the activity log", async () => {
+    const client = await connectClient(harness.address);
+    await client.callTool({ name: "file_write", arguments: { path: "activity-ok.txt", content: "x" } });
+    await client.close();
+
+    const entry = harness.activityLog.list().find((e) => e.tool === "file_write" && e.outcome === "success");
+    expect(entry).toBeDefined();
+    expect(entry?.permission).toBe("fileWrite");
+    expect(typeof entry?.durationMs).toBe("number");
+  });
+
   it("lists directory contents via workspace_files", async () => {
     const client = await connectClient(harness.address);
     await client.callTool({ name: "file_write", arguments: { path: "nested/inner.txt", content: "x" } });
@@ -230,6 +245,10 @@ describe("MCP server permission enforcement", () => {
     expect(result.isError).toBe(true);
     expect(JSON.parse(firstText(result)).code).toBe("FILE_WRITE_DISABLED");
     await client.close();
+
+    const entry = harness.activityLog.list().find((e) => e.tool === "file_write" && e.outcome === "denied");
+    expect(entry).toBeDefined();
+    expect(entry?.code).toBe("FILE_WRITE_DISABLED");
   });
 
   it("denies terminal_create under the readonly profile", async () => {

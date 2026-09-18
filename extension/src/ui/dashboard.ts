@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import type { AppContext } from "../extension.js";
+import type { ActivityEntry } from "../utils/activityLog.js";
 import type { PermissionKey } from "../security/permissions.js";
 
 function escapeHtml(value: string): string {
@@ -18,6 +19,20 @@ function permissionCard(label: string, desc: string, allowed: boolean, permKey: 
     </button>`;
 }
 
+function activityRow(entry: ActivityEntry): string {
+  const time = new Date(entry.atMs).toLocaleTimeString(undefined, { hour12: false });
+  const outcomeLabel = entry.outcome === "success" ? "OK" : entry.outcome === "denied" ? "DENIED" : "ERROR";
+  const detail = entry.code ? escapeHtml(entry.code) : entry.outcome === "success" ? `${entry.durationMs}ms` : "";
+  return `
+    <div class="activity-row activity-${entry.outcome}">
+      <span class="activity-time">${escapeHtml(time)}</span>
+      <span class="activity-tool">${escapeHtml(entry.tool)}</span>
+      <span class="activity-perm">${entry.permission ? escapeHtml(entry.permission) : "—"}</span>
+      <span class="activity-outcome ${entry.outcome}">${outcomeLabel}</span>
+      <span class="activity-detail">${detail}</span>
+    </div>`;
+}
+
 function renderHtml(ctx: AppContext): string {
   const config = ctx.getConfig();
   const running = ctx.mcpServer.isRunning();
@@ -28,6 +43,7 @@ function renderHtml(ctx: AppContext): string {
   const rawTunnel = ctx.tunnel.getUrl();
   const tunnelMcp = rawTunnel ? (rawTunnel.endsWith("/") ? `${rawTunnel}mcp` : `${rawTunnel}/mcp`) : null;
   const authRequired = ctx.policy.isAuthRequired();
+  const activity = ctx.activityLog.list(30);
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -298,6 +314,64 @@ function renderHtml(ctx: AppContext): string {
     color: var(--muted);
     margin: 4px 0;
   }
+
+  /* Activity log */
+  .activity-list {
+    max-height: 260px;
+    overflow-y: auto;
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .activity-row {
+    display: grid;
+    grid-template-columns: 72px 1fr 110px 64px 90px;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 8px;
+    border-radius: 3px;
+    font-size: 11.5px;
+    background: rgba(255, 255, 255, 0.02);
+    border-left: 2px solid transparent;
+  }
+  .activity-row.activity-success { border-left-color: #22c55e; }
+  .activity-row.activity-denied { border-left-color: #f59e0b; }
+  .activity-row.activity-error { border-left-color: #ef4444; }
+
+  .activity-time {
+    font-family: var(--vscode-editor-font-family, Consolas, monospace);
+    color: var(--muted);
+  }
+  .activity-tool {
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .activity-perm {
+    color: var(--muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .activity-outcome {
+    font-weight: 700;
+    font-size: 10px;
+    letter-spacing: 0.3px;
+  }
+  .activity-outcome.success { color: #4ade80; }
+  .activity-outcome.denied { color: #fbbf24; }
+  .activity-outcome.error { color: #f87171; }
+  .activity-detail {
+    color: var(--muted);
+    font-size: 10.5px;
+    text-align: right;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 </style>
 </head>
 <body>
@@ -409,6 +483,20 @@ function renderHtml(ctx: AppContext): string {
       ${permissionCard("Git Operations", "Git status, diff, commit", permissions.gitWrite, "gitWrite")}
       ${permissionCard("Remote Access", "Permit non-local connections", permissions.remoteAccess, "remoteAccess")}
     </div>
+  </div>
+
+  <!-- Section 3.5: Activity -->
+  <div class="section">
+    <div class="section-header">
+      <span>Activity</span>
+      <span class="meta">${activity.length} recent tool call${activity.length === 1 ? "" : "s"}</span>
+    </div>
+    <div class="meta">What clients connected to this server have actually called, and whether the active permissions allowed it.</div>
+    ${
+      activity.length === 0
+        ? `<div class="notice-box" style="margin-top:8px;">No tool calls yet.</div>`
+        : `<div class="activity-list">${activity.map(activityRow).join("")}</div>`
+    }
   </div>
 
   <!-- Section 4: Client Setup -->

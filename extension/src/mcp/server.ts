@@ -18,6 +18,7 @@ import { bindTool, type RegisteredTool, type ToolContext } from "../tools/index.
 import { searchTools } from "../tools/search.js";
 import { terminalTools } from "../tools/terminal.js";
 import { workspaceTools } from "../tools/workspace.js";
+import type { ActivityLog } from "../utils/activityLog.js";
 import { CodeLinkError, ErrorCodes } from "../utils/errors.js";
 import type { Logger } from "../utils/logger.js";
 import { OAuthServer } from "../security/oauth.js";
@@ -47,6 +48,7 @@ export interface McpServerManagerOptions {
   workspaceRoot: string;
   workspaceName: string;
   bridge: CoreBridge;
+  activityLog: ActivityLog;
   policy: SecurityPolicy;
   getConfig: () => CodeLinkConfig;
   logger: Logger;
@@ -112,6 +114,7 @@ export class McpServerManager {
       workspaceRoot: this.options.workspaceRoot,
       workspaceName: this.options.workspaceName,
       bridge: this.options.bridge,
+      activityLog: this.options.activityLog,
       getConfig: this.options.getConfig,
       logger: this.logger,
     };
