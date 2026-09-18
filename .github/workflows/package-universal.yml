@@ -7,8 +7,8 @@ on:
       - "v*"
     branches:
       - main
-      - development
-      - release
+      - "release/**"
+      - "release-*"
 
 permissions:
   contents: write
