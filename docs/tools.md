@@ -1,6 +1,6 @@
 # Tools and resources
 
-Every tool is defined with `defineTool()` in `extension/src/tools/*.ts` and registered in `extension/src/mcp/server.ts`. "Execution layer" is either **Rust** (via `RustBridge.call()`, ending up in `core/src/*.rs`) or **VS Code API** (calling `vscode.*` directly) — see [architecture.md](architecture.md) for why the split exists.
+Every tool is defined with `defineTool()` in `extension/src/tools/*.ts` and registered in `extension/src/mcp/server.ts`. "Execution layer" is either **Local core** (via `CoreBridge.call()`, ending up in `extension/src/core/*.ts`) or **VS Code API** (calling `vscode.*` directly) — see [architecture.md](architecture.md) for why the split exists.
 
 ## Workspace (`tools/workspace.ts`)
 
@@ -8,12 +8,12 @@ Every tool is defined with `defineTool()` in `extension/src/tools/*.ts` and regi
 |---|---|---|---|---|
 | `workspace_info` | `workspaceRead` | VS Code | — | Name, root path, folders, host OS, active editor. Never returns environment variables. |
 | `workspace_folders` | `workspaceRead` | VS Code | — | The workspace's configured folders. |
-| `workspace_files` | `workspaceRead` | Rust | `path?`, `glob?`, `maxDepth?`, `limit?` | Directory listing honoring `codelink.files.excludePatterns`. |
-| `workspace_search` | `workspaceSearch` | Rust | `query`, `path?`, `filePattern?`, `caseSensitive?`, `isRegex?`, `maxResults?` | Text search across the workspace. |
+| `workspace_files` | `workspaceRead` | Local core | `path?`, `glob?`, `maxDepth?`, `limit?` | Directory listing honoring `codelink.files.excludePatterns`. |
+| `workspace_search` | `workspaceSearch` | Local core | `query`, `path?`, `filePattern?`, `caseSensitive?`, `isRegex?`, `maxResults?` | Text search across the workspace. |
 
 ## Filesystem (`tools/filesystem.ts`)
 
-All paths are workspace-relative and pass through `checkFileAccess` (boundary + secret-filename check) before reaching Rust.
+All paths are workspace-relative and pass through `checkFileAccess` (boundary + secret-filename check) before reaching the local core.
 
 | Tool | Permission | Input |
 |---|---|---|
@@ -26,7 +26,7 @@ All paths are workspace-relative and pass through `checkFileAccess` (boundary + 
 | `file_list` | `workspaceRead` | `path?`, `maxDepth?`, `limit?` |
 | `file_exists` | `workspaceRead` | `path` |
 
-All execute on the Rust core (`filesystem.rs`).
+All execute on the local core (`extension/src/core/filesystem.ts`).
 
 ## Editor (`tools/editor.ts`)
 
@@ -58,14 +58,14 @@ Each diagnostic returns `{ file, severity, message, source, code, range: { start
 
 | Tool | Permission | Layer | Input |
 |---|---|---|---|
-| `file_search` | `workspaceSearch` | Rust | `pattern` (glob), `limit?` |
+| `file_search` | `workspaceSearch` | Local core | `pattern` (glob), `limit?` |
 | `symbol_search` | `workspaceSearch` | VS Code | `query` — uses `vscode.executeWorkspaceSymbolProvider` |
 
 (`workspace_search`, the text-content search, is listed under Workspace above.)
 
 ## Terminal (`tools/terminal.ts`)
 
-Execution layer: Rust (`process.rs`), via a lightweight TypeScript-side session concept. All require the `terminal` permission (off by default in every profile except `trusted`).
+Execution layer: local core (`extension/src/core/process.ts`), via a lightweight TypeScript-side session concept. All require the `terminal` permission (off by default in every profile except `trusted`).
 
 | Tool | Input | Notes |
 |---|---|---|
@@ -79,7 +79,7 @@ See [security.md](security.md#terminal-and-process-safety) for environment filte
 
 ## Git (`tools/git.ts`)
 
-Execution layer: Rust (`git.rs`), shelling out to the system `git` binary with a fixed argv. All require `gitRead` (present in every profile, including `readonly`).
+Execution layer: local core (`extension/src/core/git.ts`), shelling out to the system `git` binary with a fixed argv. All require `gitRead` (present in every profile, including `readonly`).
 
 | Tool | Input |
 |---|---|
@@ -101,6 +101,6 @@ See [mcp.md](mcp.md#resources) for the four fixed-URI resources (`workspace://in
 1. Add it to the relevant `tools/*.ts` file (or a new one, for a new category) using `defineTool()` — this gives you full type inference on `args` from the Zod `inputSchema` you declare.
 2. Pick the narrowest existing permission that fits, or add a new one to `PermissionKey` in `security/permissions.ts` (and to each profile's definition) if none fits.
 3. If the tool touches the filesystem, call `checkFileAccess()` on every path argument before calling `ctx.bridge.call()`.
-4. If the tool needs new Rust functionality, add a method to the relevant `core/src/*.rs` module and a case in `core/src/lib.rs`'s `dispatch()` — never add filesystem/process/Git logic directly in TypeScript.
+4. If the tool needs new local-core functionality, add a method to the relevant `extension/src/core/*.ts` module and a case in `extension/src/core/dispatch.ts` — keep filesystem/process/Git logic there rather than inline in a tool handler.
 5. Add the tool's array to `ALL_TOOLS` in `mcp/server.ts` if it's a new file.
-6. Add tests: a Rust unit test for new core logic, and either a `tests/security` test (pure logic) or a `tests/integration` test (through the real MCP client) for the tool itself.
+6. Add tests: either a `tests/security` test (pure logic) or a `tests/integration` test (through the real MCP client) for the tool itself.

@@ -4,20 +4,18 @@ import * as path from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { CoreBridge } from "../../extension/src/core/bridge.js";
 import { DEFAULT_CONFIG } from "../../extension/src/config/defaults.js";
 import type { CodeLinkConfig } from "../../extension/src/config/schema.js";
 import { McpServerManager, type McpServerAddress } from "../../extension/src/mcp/server.js";
-import { RustBridge } from "../../extension/src/rust/bridge.js";
 import { AuthenticationManager, InMemorySecretStore } from "../../extension/src/security/authentication.js";
 import { PermissionManager } from "../../extension/src/security/permissions.js";
 import { SecurityPolicy } from "../../extension/src/security/policy.js";
 import { RateLimiter } from "../../extension/src/security/rateLimiter.js";
 import { ConsoleSink, Logger } from "../../extension/src/utils/logger.js";
 
-const EXTENSION_ROOT = path.resolve(__dirname, "../../extension");
-
 interface Harness {
-  bridge: RustBridge;
+  bridge: CoreBridge;
   mcpServer: McpServerManager;
   authentication: AuthenticationManager;
   workspaceRoot: string;
@@ -41,7 +39,7 @@ async function startHarness(overrides: Partial<CodeLinkConfig>, port: number): P
   };
 
   const logger = silentLogger();
-  const bridge = new RustBridge({ extensionRoot: EXTENSION_ROOT, workspaceRoot, logger });
+  const bridge = new CoreBridge({ logger, extensionVersion: "0.0.0-test" });
   bridge.start();
 
   const permissions = new PermissionManager(() => config);
@@ -98,13 +96,13 @@ function firstText(result: Record<string, unknown>): string {
   return content[0]?.text ?? "";
 }
 
-describe("MCP server end-to-end (real codelink-core, real MCP client)", () => {
+describe("MCP server end-to-end (real local core, real MCP client)", () => {
   let harness: Harness;
 
   beforeAll(async () => {
     // The trusted profile is needed here so the terminal_* tool calls
     // below aren't denied by permission before they can exercise the real
-    // Rust process-spawn path this suite is meant to verify.
+    // process-spawn path this suite is meant to verify.
     harness = await startHarness({ security: { ...DEFAULT_CONFIG.security, profile: "trusted" } }, 32171);
   });
 
@@ -142,7 +140,7 @@ describe("MCP server end-to-end (real codelink-core, real MCP client)", () => {
     await client.close();
   });
 
-  it("writes and reads a file through the real Rust core", async () => {
+  it("writes and reads a file through the real local core", async () => {
     const client = await connectClient(harness.address);
     const writeResult = await client.callTool({ name: "file_write", arguments: { path: "hello.txt", content: "hi there" } });
     expect(writeResult.isError).not.toBe(true);

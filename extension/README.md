@@ -2,7 +2,7 @@
 
 Turn your VS Code workspace into a secure, local-first MCP server for external AI clients.
 
-CodeLink does not contain an AI model or an agent loop — it's the bridge between an external MCP client and your VS Code workspace: an MCP server, a security/permission layer, and a native Rust core for filesystem/search/process/Git operations.
+CodeLink does not contain an AI model or an agent loop — it's the bridge between an external MCP client and your VS Code workspace: an MCP server, a security/permission layer, and a local TypeScript core for filesystem/search/process/Git operations.
 
 ## Getting started
 

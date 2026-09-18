@@ -59,7 +59,7 @@ A tool failure's `content[0].text` is `{"code": "<CODE>", "message": "..."}`. A 
 | `PERMISSION_DENIED`, `REMOTE_ACCESS_DISABLED` | 403 | (tool-level errors use this mapping only if they somehow occur at the connection layer; in practice these are tool-level and returned as a normal `CallToolResult`) |
 | anything else | 500 | Unexpected connection-level failure |
 
-Tool-level codes (returned inside a normal `CallToolResult`, not as an HTTP error): `PERMISSION_DENIED`, `PATH_OUTSIDE_WORKSPACE`, `FILE_NOT_FOUND`, `FILE_TOO_LARGE`, `FILE_WRITE_DISABLED`, `FILE_DELETE_DISABLED`, `TERMINAL_DISABLED`, `TERMINAL_TIMEOUT`, `PROCESS_NOT_FOUND`, `GIT_WRITE_DISABLED`, `INVALID_ARGUMENT`, `REQUEST_TIMEOUT`, `SECRET_ACCESS_DENIED`, `ALREADY_EXISTS`, `NOT_A_DIRECTORY`, `IS_A_DIRECTORY`, `RUST_CORE_UNAVAILABLE`, `RUST_CORE_CRASHED`, `GIT_COMMAND_FAILED`, `INTERNAL_ERROR`. The full set is defined in `extension/src/utils/errors.ts`.
+Tool-level codes (returned inside a normal `CallToolResult`, not as an HTTP error): `PERMISSION_DENIED`, `PATH_OUTSIDE_WORKSPACE`, `FILE_NOT_FOUND`, `FILE_TOO_LARGE`, `FILE_WRITE_DISABLED`, `FILE_DELETE_DISABLED`, `TERMINAL_DISABLED`, `TERMINAL_TIMEOUT`, `PROCESS_NOT_FOUND`, `GIT_WRITE_DISABLED`, `INVALID_ARGUMENT`, `REQUEST_TIMEOUT`, `SECRET_ACCESS_DENIED`, `ALREADY_EXISTS`, `NOT_A_DIRECTORY`, `IS_A_DIRECTORY`, `GIT_COMMAND_FAILED`, `GIT_NOT_AVAILABLE`, `PROCESS_SPAWN_FAILED`, `IO_ERROR`, `OS_PERMISSION_DENIED`, `INTERNAL_ERROR`. The full set is defined in `extension/src/utils/errors.ts`.
 
 None of these expose a stack trace or internal file paths beyond the workspace-relative path already in the request.
 

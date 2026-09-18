@@ -1,8 +1,8 @@
 /**
- * Structured error codes shared across the security layer, the Rust bridge,
- * and MCP tool handlers. Keeping them in one enum-like map means every
- * layer speaks the same vocabulary and an MCP client always sees one of
- * these codes rather than a raw exception message.
+ * Structured error codes shared across the security layer, the local core
+ * (`core/*.ts`), and MCP tool handlers. Keeping them in one enum-like map
+ * means every layer speaks the same vocabulary and an MCP client always
+ * sees one of these codes rather than a raw exception message.
  */
 export const ErrorCodes = {
   AUTHENTICATION_REQUIRED: "AUTHENTICATION_REQUIRED",
@@ -21,8 +21,6 @@ export const ErrorCodes = {
   PORT_IN_USE: "PORT_IN_USE",
   SERVER_START_FAILED: "SERVER_START_FAILED",
   SERVER_NOT_RUNNING: "SERVER_NOT_RUNNING",
-  RUST_CORE_UNAVAILABLE: "RUST_CORE_UNAVAILABLE",
-  RUST_CORE_CRASHED: "RUST_CORE_CRASHED",
   INVALID_ARGUMENT: "INVALID_ARGUMENT",
   REQUEST_TIMEOUT: "REQUEST_TIMEOUT",
   RATE_LIMITED: "RATE_LIMITED",
@@ -33,6 +31,11 @@ export const ErrorCodes = {
   METHOD_NOT_FOUND: "METHOD_NOT_FOUND",
   REQUEST_CANCELLED: "REQUEST_CANCELLED",
   INTERNAL_ERROR: "INTERNAL_ERROR",
+  IO_ERROR: "IO_ERROR",
+  OS_PERMISSION_DENIED: "OS_PERMISSION_DENIED",
+  GIT_COMMAND_FAILED: "GIT_COMMAND_FAILED",
+  GIT_NOT_AVAILABLE: "GIT_NOT_AVAILABLE",
+  PROCESS_SPAWN_FAILED: "PROCESS_SPAWN_FAILED",
 } as const;
 
 export type ErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes];

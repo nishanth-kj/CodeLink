@@ -1,16 +1,15 @@
 {
   "name": "codelink-mcp",
   "private": true,
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "CodeLink turns a local VS Code workspace into a secure Model Context Protocol (MCP) server for external AI agents.",
   "license": "MIT",
   "type": "module",
   "scripts": {
     "build": "npm --prefix extension run build",
     "build:core": "cargo build --release --manifest-path core/Cargo.toml",
-    "build:all": "npm run build:core && npm run build",
     "watch": "npm --prefix extension run watch",
-    "test": "npm run typecheck:tests && npm run test:extension && npm run test:core",
+    "test": "npm run typecheck:tests && npm run test:extension",
     "test:extension": "npm --prefix extension run test",
     "test:core": "cargo test --manifest-path core/Cargo.toml",
     "typecheck:tests": "node scripts/link-test-node-modules.mjs && node extension/node_modules/typescript/bin/tsc -p tests/tsconfig.json --noEmit",

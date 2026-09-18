@@ -11,11 +11,7 @@ External AI / MCP Client
           ▼
    CodeLink (VS Code extension, TypeScript)
      MCP server · security & permissions · VS Code API
-          │
-          │  JSON IPC over stdio
-          ▼
-   codelink-core (Rust)
-     filesystem · search · processes · Git
+     local core: filesystem · search · processes · Git
           │
           ▼
      Your local workspace
@@ -24,7 +20,7 @@ External AI / MCP Client
 ## Features
 
 - **MCP server over Streamable HTTP**, built on the official `@modelcontextprotocol/sdk`, exposing tools and resources for workspace discovery, file I/O, editor state, diagnostics, search, terminal processes, and read-only Git.
-- **A native Rust core** (`codelink-core`) does every filesystem, search, process, and Git operation, communicating with the extension over a line-delimited JSON protocol on stdio. See [docs/architecture.md](docs/architecture.md).
+- **A pure TypeScript local core** (`extension/src/core/`) does every filesystem, search, process, and Git operation in-process, behind the same `call(method, params)` chokepoint every tool goes through. See [docs/architecture.md](docs/architecture.md).
 - **Local-first and safe by default**: the server binds to `127.0.0.1` only, starts stopped, and ships with file delete, terminal access, and Git writes all disabled until you turn them on.
 - **Centralized security**: every tool call passes through path validation, secret-file filtering, and a permission check before it touches your workspace — see [docs/security.md](docs/security.md).
 - **Four security profiles** (`readonly`, `developer`, `trusted`, `custom`) so you can match the permission surface to how much you trust the client on the other end.
@@ -35,8 +31,10 @@ External AI / MCP Client
 
 ```text
 CodeLink/
-├── extension/     VS Code extension (TypeScript) — MCP server, security, UI, commands
-├── core/          Native system layer (Rust) — filesystem, search, processes, Git
+├── extension/     VS Code extension (TypeScript) — MCP server, security, UI, commands,
+│                  and the local core (filesystem, search, processes, Git)
+├── core/          Standalone Rust implementation of the same core, kept in the repo but
+│                  not used by the extension (see docs/architecture.md)
 ├── tests/         Cross-cutting unit/integration tests (security, mcp, integration)
 ├── docs/          Design documentation (linked below)
 └── .vscode/       Dev-time launch/task configuration
@@ -50,7 +48,6 @@ CodeLink is not yet published to the VS Code Marketplace; install it from a buil
 git clone https://github.com/nishanth-kj/CodeLink
 cd CodeLink
 npm install --prefix extension   # extension/ is a standalone npm project
-npm run build:core               # builds core/target/release/codelink-core (requires a Rust toolchain)
 npm run build                    # compiles the extension to extension/out
 npm run package                  # produces codelink.vsix in the repo root
 ```
@@ -96,7 +93,7 @@ Full details, including the path-validation and secret-filtering design, live in
 
 ## Documentation
 
-- [docs/architecture.md](docs/architecture.md) — how the extension, the Rust core, and MCP fit together, and why.
+- [docs/architecture.md](docs/architecture.md) — how the extension, its local core, and MCP fit together, and why.
 - [docs/security.md](docs/security.md) — the security model in depth: permissions, path validation, secret filtering, rate limiting.
 - [docs/mcp.md](docs/mcp.md) — the MCP server: transport, protocol methods, the tool execution pipeline, error codes.
 - [docs/tools.md](docs/tools.md) — every MCP tool and resource, its inputs, its permission, and its execution layer.
@@ -108,27 +105,19 @@ Full details, including the path-validation and secret-filtering design, live in
 
 ```bash
 npm install --prefix extension   # extension/ is a standalone npm project, not a workspace
-npm run build:core          # cargo build --release (core/)
 npm run build               # tsc (extension/)
-npm test                    # extension unit/integration tests (vitest) + core tests (cargo test)
+npm test                    # extension unit/integration tests (vitest)
 npm run lint                # eslint (extension/)
 npm run package             # vsce package → codelink.vsix
 ```
 
-Rust-specific commands (run from `core/`, or via the `*:core` npm scripts from the repo root):
-
-```bash
-cargo build
-cargo test
-cargo fmt
-cargo clippy --all-targets -- -D warnings
-```
+The untouched, unused `core/` Rust crate still has its own commands (`npm run build:core`, `npm run test:core`, `npm run lint:core`, `npm run fmt:core`, or `cargo build`/`cargo test`/`cargo fmt`/`cargo clippy` from `core/` directly) if you want to keep working on it, but nothing under `extension/` depends on its output anymore.
 
 See [docs/development.md](docs/development.md) for the Extension Development Host workflow, the test layout, and known environment limitations (in particular, the `extension/test/` real-VS-Code-API suite requires `@vscode/test-electron` to download an actual VS Code build).
 
 ## Contributing
 
-Issues and pull requests are welcome. Please run `npm test`, `npm run lint`, `cargo test`, `cargo fmt`, and `cargo clippy` before submitting, and add tests for behavioral changes — particularly anything touching the security layer.
+Issues and pull requests are welcome. Please run `npm test` and `npm run lint` before submitting, and add tests for behavioral changes — particularly anything touching the security layer.
 
 ## License
 

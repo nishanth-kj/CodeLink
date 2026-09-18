@@ -11,8 +11,8 @@ interface TerminalSession {
 
 /** In-memory only: a terminal session is just a remembered working
  * directory grouping process runs together for the MCP client's
- * convenience. The actual process lifecycle is tracked by codelink-core
- * (see core/src/process.rs), keyed by its own process id. */
+ * convenience. The actual process lifecycle is tracked by the local core
+ * (see extension/src/core/process.ts), keyed by its own process id. */
 const sessions = new Map<string, TerminalSession>();
 
 export const terminalTools = [

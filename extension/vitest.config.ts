@@ -6,9 +6,9 @@ export default defineConfig({
     alias: {
       // Several tools/*.ts modules statically `import ... from "vscode"`,
       // which does not exist as an installed package outside the real
-      // extension host. Integration tests that only exercise Rust-backed
-      // tools (filesystem/terminal/git) can still load that module graph
-      // by resolving "vscode" to a minimal stub; see vscodeStub.ts.
+      // extension host. Integration tests that only exercise local-core-
+      // backed tools (filesystem/terminal/git) can still load that module
+      // graph by resolving "vscode" to a minimal stub; see vscodeStub.ts.
       vscode: path.resolve(__dirname, "../tests/integration/vscodeStub.ts"),
     },
   },
