@@ -25,6 +25,7 @@ import { TunnelManager } from "./tunnel/manager.js";
 import { DashboardPanel } from "./ui/dashboard.js";
 import { SidebarViewProvider } from "./ui/sidebar.js";
 import { StatusBarController } from "./ui/statusBar.js";
+import { ActivityLog } from "./utils/activityLog.js";
 import { ConsoleSink, Logger, type LogLevel, type LogSink } from "./utils/logger.js";
 
 /** Everything a command or UI module needs, assembled once in `activate()`
@@ -37,6 +38,7 @@ export interface AppContext {
   workspaceName: string;
   logger: Logger;
   bridge: CoreBridge;
+  activityLog: ActivityLog;
   mcpServer: McpServerManager;
   permissions: PermissionManager;
   authentication: AuthenticationManager;
@@ -82,6 +84,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     logger,
     extensionVersion: (context.extension.packageJSON as { version?: string }).version ?? "0.0.0",
   });
+  const activityLog = new ActivityLog();
   const permissions = new PermissionManager(getConfig);
   const authentication = new AuthenticationManager(context.secrets);
   const rateLimiter = new RateLimiter(
@@ -96,6 +99,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     workspaceRoot,
     workspaceName,
     bridge,
+    activityLog,
     policy,
     getConfig,
     logger,
@@ -107,6 +111,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     workspaceName,
     logger,
     bridge,
+    activityLog,
     mcpServer,
     permissions,
     authentication,
@@ -134,6 +139,24 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       sidebarProvider.refresh();
     }),
   );
+
+  // Refresh the dashboard/sidebar's Activity section as tool calls happen,
+  // coalesced to one refresh per tick rather than one per entry — a client
+  // polling terminal_output can record several entries within a single
+  // event-loop turn.
+  let activityRefreshQueued = false;
+  const unsubscribeActivity = activityLog.onEntry(() => {
+    if (activityRefreshQueued) {
+      return;
+    }
+    activityRefreshQueued = true;
+    setImmediate(() => {
+      activityRefreshQueued = false;
+      DashboardPanel.refreshIfOpen(ctx);
+      sidebarProvider.refresh();
+    });
+  });
+  context.subscriptions.push({ dispose: unsubscribeActivity });
 
   const register = (id: string, handler: () => unknown): void => {
     context.subscriptions.push(vscode.commands.registerCommand(id, handler));

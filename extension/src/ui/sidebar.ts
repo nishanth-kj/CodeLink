@@ -130,6 +130,7 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
     const tunnelRunning = this.ctx.tunnel.isRunning();
     const tunnelUrl = this.ctx.tunnel.getUrl();
     const authRequired = this.ctx.policy.isAuthRequired();
+    const activity = this.ctx.activityLog.list(8);
 
     const escapeHtml = (value: string): string =>
       value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -139,6 +140,18 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
       `<span class="perm-name">${escapeHtml(label)}</span>` +
       `<span class="perm-state">${allowed ? "ON" : "OFF"}</span>` +
       `</button>`;
+
+    const activityRow = (entry: (typeof activity)[number]): string => {
+      const time = new Date(entry.atMs).toLocaleTimeString(undefined, { hour12: false });
+      const outcomeLabel = entry.outcome === "success" ? "OK" : entry.outcome === "denied" ? "DENIED" : "ERROR";
+      return (
+        `<div class="activity-row activity-${entry.outcome}">` +
+        `<span class="activity-time">${escapeHtml(time)}</span>` +
+        `<span class="activity-tool">${escapeHtml(entry.tool)}</span>` +
+        `<span class="activity-outcome ${entry.outcome}">${outcomeLabel}</span>` +
+        `</div>`
+      );
+    };
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -324,6 +337,47 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
     flex-direction: column;
     gap: 5px;
   }
+
+  /* Activity log */
+  .activity-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: 160px;
+    overflow-y: auto;
+  }
+  .activity-row {
+    display: grid;
+    grid-template-columns: 56px 1fr 44px;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 6px;
+    border-radius: 3px;
+    font-size: 10.5px;
+    background: rgba(255,255,255,0.03);
+    border-left: 2px solid transparent;
+  }
+  .activity-row.activity-success { border-left-color: #22c55e; }
+  .activity-row.activity-denied { border-left-color: #f59e0b; }
+  .activity-row.activity-error { border-left-color: #ef4444; }
+  .activity-time {
+    font-family: var(--vscode-editor-font-family, Consolas, monospace);
+    color: var(--vscode-descriptionForeground);
+  }
+  .activity-tool {
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .activity-outcome {
+    font-weight: 700;
+    font-size: 9px;
+    text-align: right;
+  }
+  .activity-outcome.success { color: #4ade80; }
+  .activity-outcome.denied { color: #fbbf24; }
+  .activity-outcome.error { color: #f87171; }
 </style>
 </head>
 <body>
@@ -402,6 +456,17 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
   <div class="btn-row" style="margin-bottom: 8px;">
     <button class="secondary" style="font-size:11px;" data-command="allowAllPermissions">Allow All</button>
   </div>
+
+  <!-- Activity -->
+  <div class="section-title">
+    <span>Activity</span>
+    <button class="secondary" style="flex:none; font-size:9.5px; padding:2px 6px;" data-command="openDashboard">See all</button>
+  </div>
+  ${
+    activity.length === 0
+      ? `<div class="desc" style="margin-bottom:8px;">No tool calls yet.</div>`
+      : `<div class="activity-list" style="margin-bottom:10px;">${activity.map(activityRow).join("")}</div>`
+  }
 
   <!-- Footer Actions -->
   <div class="footer">
