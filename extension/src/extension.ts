@@ -34,6 +34,7 @@ import { ConsoleSink, Logger, type LogLevel, type LogSink } from "./utils/logger
  * call, so a settings change takes effect without re-wiring anything). */
 export interface AppContext {
   extensionContext: vscode.ExtensionContext;
+  version: string;
   workspaceRoot: string;
   workspaceName: string;
   logger: Logger;
@@ -51,7 +52,7 @@ export interface AppContext {
 }
 
 class OutputChannelSink implements LogSink {
-  constructor(private readonly channel: vscode.OutputChannel) {}
+  constructor(private readonly channel: vscode.OutputChannel) { }
   write(_level: LogLevel, line: string): void {
     this.channel.appendLine(line);
   }
@@ -80,9 +81,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const workspaceRoot = workspaceFolder.uri.fsPath;
   const workspaceName = workspaceFolder.name;
 
+  const version = (context.extension.packageJSON as { version?: string }).version ?? "0.0.0";
+
   const bridge = new CoreBridge({
     logger,
-    extensionVersion: (context.extension.packageJSON as { version?: string }).version ?? "0.0.0",
+    extensionVersion: version,
   });
   const activityLog = new ActivityLog();
   const permissions = new PermissionManager(getConfig);
@@ -95,7 +98,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const tunnel = new TunnelManager(getConfig, logger, context.extensionPath);
   const statusBar = new StatusBarController();
   const mcpServer = new McpServerManager({
-    extensionVersion: (context.extension.packageJSON as { version?: string }).version ?? "0.0.0",
+    extensionVersion: version,
     workspaceRoot,
     workspaceName,
     bridge,
@@ -107,6 +110,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   const ctx: AppContext = {
     extensionContext: context,
+    version,
     workspaceRoot,
     workspaceName,
     logger,
@@ -204,7 +208,7 @@ async function maybeShowFirstRunNotification(context: vscode.ExtensionContext): 
   await context.globalState.update(WELCOME_SHOWN_KEY, true);
   const choice = await vscode.window.showInformationMessage(
     "CodeLink is installed. Your workspace can be exposed to MCP clients through a local server. " +
-      "The server is currently stopped. Review security settings before enabling remote access.",
+    "The server is currently stopped. Review security settings before enabling remote access.",
     "Open CodeLink",
   );
   if (choice === "Open CodeLink" && appContext) {
