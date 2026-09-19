@@ -7,7 +7,7 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "codelink.sidebarView";
   private view?: vscode.WebviewView;
 
-  constructor(private ctx: AppContext) {}
+  constructor(private ctx: AppContext) { }
 
   updateContext(ctx: AppContext): void {
     this.ctx = ctx;
@@ -179,6 +179,15 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
     display: flex;
     justify-content: space-between;
     align-items: center;
+  }
+  .version-tag {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--vscode-descriptionForeground);
+    background: rgba(255,255,255,0.06);
+    padding: 1px 5px;
+    border-radius: 3px;
+    letter-spacing: 0.2px;
   }
   .box {
     background: var(--vscode-editor-inactiveSelectionBackground, rgba(255,255,255,0.04));
@@ -382,7 +391,10 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
 </head>
 <body>
   <!-- MCP Server -->
-  <div class="section-title">Server</div>
+  <div class="section-title">
+    <span>Server</span>
+    <span class="version-tag">v${escapeHtml(this.ctx.version ?? "0.3.2")}</span>
+  </div>
   <div class="box">
     <div class="status-line">
       <span class="indicator ${running ? "on" : "off"}"></span>
@@ -402,8 +414,7 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
       <span class="indicator ${tunnelRunning ? "on" : "off"}"></span>
       <span>${tunnelRunning ? "Active" : "Stopped"}</span>
     </div>
-    ${
-      tunnelRunning && tunnelUrl
+    ${tunnelRunning && tunnelUrl
         ? `
     <code class="code">${escapeHtml(tunnelUrl.endsWith("/") ? `${tunnelUrl}mcp` : `${tunnelUrl}/mcp`)}</code>
     <div class="btn-row">
@@ -414,7 +425,7 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
     <div class="btn-row">
       <button data-command="startTunnel">Start Tunnel &amp; Copy URL</button>
     </div>`
-    }
+      }
   </div>
 
   <!-- Authentication -->
@@ -425,20 +436,18 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
       <button class="switch-btn ${authRequired ? "active" : ""}" data-auth="required">Require Auth</button>
     </div>
     <div class="desc">
-      ${
-        !authRequired
-          ? "No Auth active. Direct connection without credentials."
-          : "Authentication required via OAuth 2.0 or bearer token."
+      ${!authRequired
+        ? "No Auth active. Direct connection without credentials."
+        : "Authentication required via OAuth 2.0 or bearer token."
       }
     </div>
-    ${
-      authRequired
+    ${authRequired
         ? `
     <div class="btn-row" style="margin-top:6px;">
       <button class="secondary" data-command="generateToken">Generate Token</button>
     </div>`
         : ""
-    }
+      }
   </div>
 
   <!-- Permissions -->
@@ -462,11 +471,10 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
     <span>Activity</span>
     <button class="secondary" style="flex:none; font-size:9.5px; padding:2px 6px;" data-command="openDashboard">See all</button>
   </div>
-  ${
-    activity.length === 0
-      ? `<div class="desc" style="margin-bottom:8px;">No tool calls yet.</div>`
-      : `<div class="activity-list" style="margin-bottom:10px;">${activity.map(activityRow).join("")}</div>`
-  }
+  ${activity.length === 0
+        ? `<div class="desc" style="margin-bottom:8px;">No tool calls yet.</div>`
+        : `<div class="activity-list" style="margin-bottom:10px;">${activity.map(activityRow).join("")}</div>`
+      }
 
   <!-- Footer Actions -->
   <div class="footer">

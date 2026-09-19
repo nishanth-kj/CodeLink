@@ -89,6 +89,18 @@ function renderHtml(ctx: AppContext): string {
     margin: 0 0 4px 0;
   }
 
+  .version-tag {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    background: var(--vscode-badge-background, rgba(255,255,255,0.08));
+    padding: 2px 7px;
+    border-radius: 4px;
+    margin-left: 8px;
+    vertical-align: middle;
+    letter-spacing: 0.3px;
+  }
+
   .meta {
     font-size: 12px;
     color: var(--muted);
@@ -378,7 +390,7 @@ function renderHtml(ctx: AppContext): string {
   <!-- Header -->
   <div class="header">
     <div>
-      <h1>CodeLink Control Center</h1>
+      <h1>CodeLink Control Center <span class="version-tag">v${escapeHtml(ctx.version ?? "0.3.2")}</span></h1>
       <div class="meta">Workspace: <code>${escapeHtml(ctx.workspaceName)}</code> (${escapeHtml(ctx.workspaceRoot)})</div>
     </div>
     <div class="status-group">
@@ -400,9 +412,8 @@ function renderHtml(ctx: AppContext): string {
   <!-- Section 1: Connection Endpoints -->
   <div class="section">
     <div class="section-header">Endpoints</div>
-    ${
-      tunnelRunning && tunnelMcp
-        ? `
+    ${tunnelRunning && tunnelMcp
+      ? `
     <div class="meta" style="margin-bottom:2px;">Public Tunnel Endpoint:</div>
     <div class="code-line">
       <span>${escapeHtml(tunnelMcp)}</span>
@@ -413,15 +424,14 @@ function renderHtml(ctx: AppContext): string {
       <button class="secondary" data-command="stopTunnel">Stop Tunnel</button>
     </div>
     `
-        : `
+      : `
     <div class="btn-row">
       <button data-command="startTunnel">Start Tunnel &amp; Copy URL</button>
     </div>
     `
     }
-    ${
-      localEndpoint
-        ? `
+    ${localEndpoint
+      ? `
     <div class="meta" style="margin-top:10px; margin-bottom:2px;">Local Endpoint:</div>
     <div class="code-line">
       <span>${escapeHtml(localEndpoint)}</span>
@@ -431,7 +441,7 @@ function renderHtml(ctx: AppContext): string {
       ${running ? `<button class="secondary" data-command="restart">Restart Server</button>` : ""}
     </div>
     `
-        : ""
+      : ""
     }
   </div>
 
@@ -443,14 +453,13 @@ function renderHtml(ctx: AppContext): string {
       <button class="switch-btn ${!authRequired ? "active" : ""}" data-auth="none">No Auth (Open)</button>
       <button class="switch-btn ${authRequired ? "active" : ""}" data-auth="required">Require Auth (Tokens / OAuth)</button>
     </div>
-    ${
-      !authRequired
-        ? `
+    ${!authRequired
+      ? `
     <div class="notice-box open">
       No Auth active. Direct connection enabled without tokens or authorization handshakes.
     </div>
     `
-        : `
+      : `
     <div class="notice-box protected">
       Authentication active. Incoming requests must supply a valid OAuth 2.0 or bearer access token.
     </div>
@@ -492,10 +501,9 @@ function renderHtml(ctx: AppContext): string {
       <span class="meta">${activity.length} recent tool call${activity.length === 1 ? "" : "s"}</span>
     </div>
     <div class="meta">What clients connected to this server have actually called, and whether the active permissions allowed it.</div>
-    ${
-      activity.length === 0
-        ? `<div class="notice-box" style="margin-top:8px;">No tool calls yet.</div>`
-        : `<div class="activity-list">${activity.map(activityRow).join("")}</div>`
+    ${activity.length === 0
+      ? `<div class="notice-box" style="margin-top:8px;">No tool calls yet.</div>`
+      : `<div class="activity-list">${activity.map(activityRow).join("")}</div>`
     }
   </div>
 
