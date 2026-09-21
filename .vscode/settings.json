@@ -17,5 +17,6 @@
     "core/Cargo.toml"
   ],
   "codelink.remote.enabled": true,
-  "codelink.security.requireAuth": false
+  "codelink.security.requireAuth": false,
+  "codelink.remote.ipv6": true
 }
