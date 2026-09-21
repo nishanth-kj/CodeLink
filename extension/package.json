@@ -2,7 +2,7 @@
   "name": "codelink-mcp",
   "displayName": "CodeLink MCP",
   "description": "Turn your VS Code workspace into a secure local MCP server for external AI agents.",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "icon": "media/icon.png",
   "publisher": "nishanth-kj",
   "license": "MIT",

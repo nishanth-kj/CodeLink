@@ -47,12 +47,16 @@ CodeLink is not yet published to the VS Code Marketplace; install it from a buil
 ```bash
 git clone https://github.com/nishanth-kj/CodeLink
 cd CodeLink
-npm install --prefix extension   # extension/ is a standalone npm project
-npm run build                    # compiles the extension to extension/out
-npm run package                  # produces codelink.vsix in the repo root
+npm run package:local            # installs dependencies, compiles, and writes codelink.vsix to the repo root
 ```
 
-Then in VS Code: **Extensions → ⋯ → Install from VSIX…** and select `codelink.vsix`.
+That creates `codelink.vsix` in the repo root (`CodeLink/codelink.vsix`); the compiled JavaScript goes to `extension/out/`. Then install it, either from a terminal:
+
+```bash
+code --install-extension codelink.vsix --force
+```
+
+or in VS Code via **Extensions → ⋯ → Install from VSIX…** and selecting `codelink.vsix`. Reload the window afterwards.
 
 See [docs/development.md](docs/development.md) for the full development setup, including running the extension from source in the Extension Development Host.
 
@@ -105,11 +109,17 @@ Full details, including the path-validation and secret-filtering design, live in
 
 ```bash
 npm install --prefix extension   # extension/ is a standalone npm project, not a workspace
-npm run build               # tsc (extension/)
+npm run build               # tsc (extension/) → extension/out
+npm run build:local         # npm install --prefix extension, then build — one step from a fresh clone
 npm test                    # extension unit/integration tests (vitest)
 npm run lint                # eslint (extension/)
-npm run package             # vsce package → codelink.vsix
+npm run package             # vsce package → codelink.vsix in the repo root
+npm run package:local       # install dependencies, build, and package in one step
+npm run version:set -- X.Y.Z  # change the version: edits .version and syncs every manifest
+npm run version:check       # fail if any manifest's version differs from .version
 ```
+
+The version is defined once, in the root `.version` file — see [Versioning in docs/development.md](docs/development.md#versioning).
 
 The untouched, unused `core/` Rust crate still has its own commands (`npm run build:core`, `npm run test:core`, `npm run lint:core`, `npm run fmt:core`, or `cargo build`/`cargo test`/`cargo fmt`/`cargo clippy` from `core/` directly) if you want to keep working on it, but nothing under `extension/` depends on its output anymore.
 

@@ -393,7 +393,7 @@ function renderHtml(ctx: AppContext): string {
   <!-- Header -->
   <div class="header">
     <div>
-      <h1>CodeLink Control Center <span class="version-tag">v${escapeHtml(ctx.version ?? "0.3.2")}</span></h1>
+      <h1>CodeLink Control Center <span class="version-tag">v${escapeHtml(ctx.version)}</span></h1>
       <div class="meta">Workspace: <code>${escapeHtml(ctx.workspaceName)}</code> (${escapeHtml(ctx.workspaceRoot)})</div>
     </div>
     <div class="status-group">

@@ -26,6 +26,13 @@ jobs:
         with:
           node-version: 20
 
+      - name: Check version consistency
+        run: node scripts/version.mjs check
+
+      - name: Check release tag matches .version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: test "${GITHUB_REF_NAME#v}" = "$(cat .version)"
+
       - name: Install extension dependencies
         run: npm install --prefix extension
 

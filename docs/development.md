@@ -69,6 +69,22 @@ npm run lint      # eslint (extension/src)
 
 If you're also working on the unused `core/` Rust crate, it keeps its own formatting/linting commands: `npm run fmt:core`, `npm run fmt:core:check`, `npm run lint:core` (or `cargo fmt`/`cargo clippy` from `core/` directly).
 
+## Versioning
+
+The project version lives in one place: the **`.version`** file at the repo root. To release a new version, change it there and let the script copy it everywhere:
+
+```bash
+npm run version:set -- 0.4.0   # writes .version, then updates every file below
+npm run version:check          # fails if any file differs from .version
+npm run version:sync           # re-copies .version after you edit it by hand
+```
+
+`npm`, the VS Code manifest and Cargo can't read another file, so each keeps a literal copy, which `scripts/version.mjs` maintains: `package.json`, `extension/package.json`, `extension/package-lock.json` (both entries), `core/Cargo.toml`, and the `codelink-core` entry in `core/Cargo.lock`. Only the version text is rewritten, so formatting and line endings are untouched. Never edit those copies by hand.
+
+Everything else reads the version at runtime instead of hardcoding it: the extension takes it from its own manifest (`context.extension.packageJSON.version`), and the dashboard, sidebar and MCP server info all use that value.
+
+Drift is caught in three places: `npm test`, `npm run package` (a `prepackage` hook), and the packaging workflow, which also checks that a `v*` release tag matches `.version` before anything is published. To stop tracking another file, add or remove its entry in `TARGETS` at the top of `scripts/version.mjs`.
+
 ## Packaging
 
 ```bash

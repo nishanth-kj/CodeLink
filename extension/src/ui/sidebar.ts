@@ -397,7 +397,7 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
   <!-- MCP Server -->
   <div class="section-title">
     <span>Server</span>
-    <span class="version-tag">v${escapeHtml(this.ctx.version ?? "0.3.2")}</span>
+    <span class="version-tag">v${escapeHtml(this.ctx.version)}</span>
   </div>
   <div class="box">
     <div class="status-line">
