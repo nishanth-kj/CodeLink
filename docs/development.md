@@ -15,6 +15,12 @@ cd CodeLink
 npm install --prefix extension   # extension/ is a standalone npm project, not a workspace
 ```
 
+Or, to install dependencies and compile in one step from the repo root:
+
+```bash
+npm run build:local              # npm install --prefix extension, then tsc → extension/out
+```
+
 ## Running from source
 
 Open the repository root in VS Code and use the **Run CodeLink Extension** launch configuration (`.vscode/launch.json`), which runs `extension: watch` (`tsc -w`) first and launches an Extension Development Host with this repo (or any folder you open in that host) as the workspace. The "CodeLink is installed…" first-run notice appears once; the server itself stays stopped until you run **CodeLink: Start MCP Server**.
@@ -63,6 +69,22 @@ npm run lint      # eslint (extension/src)
 
 If you're also working on the unused `core/` Rust crate, it keeps its own formatting/linting commands: `npm run fmt:core`, `npm run fmt:core:check`, `npm run lint:core` (or `cargo fmt`/`cargo clippy` from `core/` directly).
 
+## Versioning
+
+The project version lives in one place: the **`.version`** file at the repo root. To release a new version, change it there and let the script copy it everywhere:
+
+```bash
+npm run version:set -- 0.4.0   # writes .version, then updates every file below
+npm run version:check          # fails if any file differs from .version
+npm run version:sync           # re-copies .version after you edit it by hand
+```
+
+`npm`, the VS Code manifest and Cargo can't read another file, so each keeps a literal copy, which `scripts/version.mjs` maintains: `package.json`, `extension/package.json`, `extension/package-lock.json` (both entries), `core/Cargo.toml`, and the `codelink-core` entry in `core/Cargo.lock`. Only the version text is rewritten, so formatting and line endings are untouched. Never edit those copies by hand.
+
+Everything else reads the version at runtime instead of hardcoding it: the extension takes it from its own manifest (`context.extension.packageJSON.version`), and the dashboard, sidebar and MCP server info all use that value.
+
+Drift is caught in three places: `npm test`, `npm run package` (a `prepackage` hook), and the packaging workflow, which also checks that a `v*` release tag matches `.version` before anything is published. To stop tracking another file, add or remove its entry in `TARGETS` at the top of `scripts/version.mjs`.
+
 ## Packaging
 
 ```bash
@@ -70,7 +92,9 @@ npm run build     # tsc (from the repo root; delegates to extension/)
 npm run package   # vsce package -o codelink.vsix (from the repo root; delegates to extension/)
 ```
 
-This produces `codelink.vsix` (a few MB — `extension/`'s compiled output, `LICENSE`, `README.md`, and its production `node_modules`; no `--no-dependencies` flag, since `@modelcontextprotocol/sdk` and `zod` are real runtime dependencies, not bundled via esbuild). The extension has no native binary to bundle: the local core is plain TypeScript compiled alongside everything else, so the same `.vsix` runs unmodified on every platform VS Code supports.
+Or, from a fresh clone, `npm run package:local` installs dependencies, compiles, and packages in one step.
+
+This produces `codelink.vsix` in the repo root (a few MB — `extension/`'s compiled output, `LICENSE`, `README.md`, and its production `node_modules`; no `--no-dependencies` flag, since `@modelcontextprotocol/sdk` and `zod` are real runtime dependencies, not bundled via esbuild). The extension has no native binary to bundle: the local core is plain TypeScript compiled alongside everything else, so the same `.vsix` runs unmodified on every platform VS Code supports.
 
 **`extension/` is a standalone npm project, not an npm workspace**, specifically because of how `vsce package` discovers files: it runs `npm list --production --parseable --depth=99999` from the package directory to find dependency folders to include, and in a workspaces monorepo that walk resolves the workspace root itself as a "dependency" — which made `vsce` try to glob the *entire repository* into the VSIX, and then fail outright on a path that climbed outside the accepted package root. If you're tempted to reintroduce `"workspaces": ["extension"]` in the root `package.json` for convenience, check that `vsce package` still produces a small, sane VSIX afterward (`vsce ls --tree` from `extension/` shows exactly what would be included).
 

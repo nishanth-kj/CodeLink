@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  defaultProtocolForHost,
   extractBearerToken,
   httpStatusForErrorCode,
   isHostHeaderAllowed,
@@ -42,6 +43,21 @@ describe("isHostHeaderAllowed", () => {
   it("allows any host once remote access is enabled", () => {
     expect(isHostHeaderAllowed("evil.example.com", 32100, true)).toBe(true);
     expect(isHostHeaderAllowed(undefined, 32100, true)).toBe(true);
+  });
+});
+
+describe("defaultProtocolForHost", () => {
+  it("assumes plain http for localhost and bare IP addresses, IPv4 or IPv6", () => {
+    expect(defaultProtocolForHost("localhost:32100")).toBe("http");
+    expect(defaultProtocolForHost("127.0.0.1:32100")).toBe("http");
+    expect(defaultProtocolForHost("192.168.1.5:32100")).toBe("http");
+    expect(defaultProtocolForHost("[::1]:32100")).toBe("http");
+    expect(defaultProtocolForHost("[2401:4900:8839:ebc6::1]:32100")).toBe("http");
+  });
+
+  it("assumes https for a named host, which can only be a TLS-terminating tunnel or proxy", () => {
+    expect(defaultProtocolForHost("random-words.trycloudflare.com")).toBe("https");
+    expect(defaultProtocolForHost("localhost.evil.example")).toBe("https");
   });
 });
 

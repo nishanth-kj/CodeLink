@@ -1,4 +1,6 @@
 import * as vscode from "vscode";
+import { setRemoteEnabled } from "../commands/remoteAccess.js";
+import { bindsAllIpv6, ipv6Endpoints, localEndpoint } from "../config/network.js";
 import type { AppContext } from "../extension.js";
 import type { ActivityEntry } from "../utils/activityLog.js";
 import type { PermissionKey } from "../security/permissions.js";
@@ -37,8 +39,9 @@ function renderHtml(ctx: AppContext): string {
   const config = ctx.getConfig();
   const running = ctx.mcpServer.isRunning();
   const permissions = ctx.permissions.snapshot();
-  const host = config.remote.enabled ? config.server.host : "127.0.0.1";
-  const localEndpoint = running ? `http://${host}:${config.server.port}/mcp` : null;
+  const localUrl = running ? localEndpoint(config) : null;
+  const ipv6On = bindsAllIpv6(config);
+  const ipv6Urls = ipv6On && running ? ipv6Endpoints(config) : [];
   const tunnelRunning = ctx.tunnel.isRunning();
   const rawTunnel = ctx.tunnel.getUrl();
   const tunnelMcp = rawTunnel ? (rawTunnel.endsWith("/") ? `${rawTunnel}mcp` : `${rawTunnel}/mcp`) : null;
@@ -390,7 +393,7 @@ function renderHtml(ctx: AppContext): string {
   <!-- Header -->
   <div class="header">
     <div>
-      <h1>CodeLink Control Center <span class="version-tag">v${escapeHtml(ctx.version ?? "0.3.2")}</span></h1>
+      <h1>CodeLink Control Center <span class="version-tag">v${escapeHtml(ctx.version)}</span></h1>
       <div class="meta">Workspace: <code>${escapeHtml(ctx.workspaceName)}</code> (${escapeHtml(ctx.workspaceRoot)})</div>
     </div>
     <div class="status-group">
@@ -401,6 +404,10 @@ function renderHtml(ctx: AppContext): string {
       <div class="status-tag">
         <span class="indicator-dot ${tunnelRunning ? "on" : "off"}"></span>
         Tunnel: ${tunnelRunning ? "Active" : "Stopped"}
+      </div>
+      <div class="status-tag">
+        <span class="indicator-dot ${ipv6On ? "on" : "off"}"></span>
+        Direct IPv6: ${ipv6On ? "On" : "Off"}
       </div>
       <div class="status-tag">
         <span class="indicator-dot ${authRequired ? "off" : "on"}"></span>
@@ -430,11 +437,33 @@ function renderHtml(ctx: AppContext): string {
     </div>
     `
     }
-    ${localEndpoint
+    <div class="meta" style="margin-top:10px; margin-bottom:2px;">Direct IPv6 Endpoint:</div>
+    ${ipv6On
+      ? !running
+        ? `<div class="notice-box">Start the server to accept IPv6 connections.</div>`
+        : ipv6Urls.length === 0
+          ? `<div class="notice-box">No IPv6 address that other hosts can reach was found on this machine.</div>`
+          : ipv6Urls
+              .map(
+                (entry) => `
+    <div class="code-line">
+      <span>${escapeHtml(entry.url)}${entry.scope === "unique-local" ? " (local network only)" : ""}</span>
+    </div>`,
+              )
+              .join("")
+      : `<div class="meta">Let others connect straight to this machine's IPv6 address and port, no tunnel needed.</div>`
+    }
+    <div class="btn-row">
+      ${ipv6On
+      ? `${ipv6Urls.length > 0 ? `<button data-command="copyIpv6Url">Copy IPv6 URL</button>` : ""}<button class="secondary" data-command="disableIpv6">Disable Direct IPv6</button>`
+      : `<button data-command="enableIpv6">Enable Direct IPv6</button>`
+    }
+    </div>
+    ${localUrl
       ? `
     <div class="meta" style="margin-top:10px; margin-bottom:2px;">Local Endpoint:</div>
     <div class="code-line">
-      <span>${escapeHtml(localEndpoint)}</span>
+      <span>${escapeHtml(localUrl)}</span>
     </div>
     <div class="btn-row">
       ${!running ? `<button data-command="start">Start Server</button>` : `<button class="secondary" data-command="stop">Stop Server</button>`}
@@ -511,7 +540,7 @@ function renderHtml(ctx: AppContext): string {
   <div class="section">
     <div class="section-header">Client Setup</div>
     <div class="guide-step">1. In your client (such as Claude.ai or Cursor), add MCP server with Streamable HTTP transport.</div>
-    <div class="guide-step">2. Set server URL to: <code>${escapeHtml(tunnelMcp ?? "http://127.0.0.1:32100/mcp")}</code></div>
+    <div class="guide-step">2. Set server URL to: <code>${escapeHtml(tunnelMcp ?? ipv6Urls[0]?.url ?? "http://127.0.0.1:32100/mcp")}</code></div>
     <div class="guide-step">3. With <strong>No Auth</strong> selected, the connection establishes immediately without credentials.</div>
     <div class="btn-row" style="margin-top:12px;">
       <button class="secondary" data-command="reloadWindow">Reload Window</button>
@@ -611,9 +640,7 @@ export class DashboardPanel {
       const key = permission as PermissionKey;
       const next = this.ctx.permissions.toggle(key);
       if (key === "remoteAccess") {
-        await vscode.workspace
-          .getConfiguration("codelink")
-          .update("remote.enabled", next, vscode.ConfigurationTarget.Workspace);
+        await setRemoteEnabled(this.ctx, next);
       }
       this.refresh();
       this.ctx.sidebar?.refresh();
@@ -677,6 +704,9 @@ export class DashboardPanel {
       startTunnel: "codelink.startTunnel",
       stopTunnel: "codelink.stopTunnel",
       copyTunnelUrl: "codelink.copyTunnelUrl",
+      enableIpv6: "codelink.enableIpv6Access",
+      disableIpv6: "codelink.disableIpv6Access",
+      copyIpv6Url: "codelink.copyIpv6Url",
     };
 
     if (command && commandMap[command]) {

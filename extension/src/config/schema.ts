@@ -20,6 +20,10 @@ export interface CodeLinkConfig {
   };
   remote: {
     enabled: boolean;
+    /** Listen on every IPv6 interface (`::`) so clients can reach the server
+     * directly at `http://[<ipv6-address>]:<port>/mcp`. Only honoured while
+     * `enabled` is true. */
+    ipv6: boolean;
   };
   files: {
     excludePatterns: string[];

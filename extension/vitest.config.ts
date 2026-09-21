@@ -16,6 +16,7 @@ export default defineConfig({
     include: [
       "../tests/security/**/*.test.ts",
       "../tests/mcp/**/*.test.ts",
+      "../tests/scripts/**/*.test.ts",
       "../tests/integration/**/*.test.ts"
     ],
     environment: "node",

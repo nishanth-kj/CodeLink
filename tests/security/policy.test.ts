@@ -19,19 +19,19 @@ function buildPolicy(config: CodeLinkConfig) {
 
 describe("SecurityPolicy.authorizeConnection", () => {
   it("allows local (non-remote) connections without a token", async () => {
-    const { policy } = buildPolicy({ ...DEFAULT_CONFIG, remote: { enabled: false } });
+    const { policy } = buildPolicy({ ...DEFAULT_CONFIG, remote: { ...DEFAULT_CONFIG.remote, enabled: false } });
     await expect(policy.authorizeConnection({ clientId: "local" })).resolves.toBeUndefined();
   });
 
   it("rejects remote connections with no token as AUTHENTICATION_REQUIRED", async () => {
-    const { policy } = buildPolicy({ ...DEFAULT_CONFIG, remote: { enabled: true } });
+    const { policy } = buildPolicy({ ...DEFAULT_CONFIG, remote: { ...DEFAULT_CONFIG.remote, enabled: true } });
     await expect(policy.authorizeConnection({ clientId: "remote" })).rejects.toMatchObject({
       code: "AUTHENTICATION_REQUIRED",
     });
   });
 
   it("rejects remote connections with a wrong token as AUTHENTICATION_FAILED", async () => {
-    const { policy, authentication } = buildPolicy({ ...DEFAULT_CONFIG, remote: { enabled: true } });
+    const { policy, authentication } = buildPolicy({ ...DEFAULT_CONFIG, remote: { ...DEFAULT_CONFIG.remote, enabled: true } });
     await authentication.generateToken();
     await expect(policy.authorizeConnection({ clientId: "remote", bearerToken: "wrong" })).rejects.toMatchObject({
       code: "AUTHENTICATION_FAILED",
@@ -39,7 +39,7 @@ describe("SecurityPolicy.authorizeConnection", () => {
   });
 
   it("allows a remote connection with a valid token", async () => {
-    const { policy, authentication } = buildPolicy({ ...DEFAULT_CONFIG, remote: { enabled: true } });
+    const { policy, authentication } = buildPolicy({ ...DEFAULT_CONFIG, remote: { ...DEFAULT_CONFIG.remote, enabled: true } });
     const token = await authentication.generateToken();
     await expect(policy.authorizeConnection({ clientId: "remote", bearerToken: token })).resolves.toBeUndefined();
   });
@@ -47,7 +47,7 @@ describe("SecurityPolicy.authorizeConnection", () => {
   it("enforces the rate limit only for remote connections", async () => {
     const config: CodeLinkConfig = {
       ...DEFAULT_CONFIG,
-      remote: { enabled: true },
+      remote: { ...DEFAULT_CONFIG.remote, enabled: true },
       rateLimit: { requestsPerMinute: 1, maxConcurrentRequests: 10 },
     };
     const { policy, authentication } = buildPolicy(config);
@@ -79,7 +79,7 @@ describe("SecurityPolicy.checkPermission", () => {
 
 describe("SecurityPolicy.acquireConcurrency", () => {
   it("is a no-op for local requests", () => {
-    const { policy } = buildPolicy({ ...DEFAULT_CONFIG, remote: { enabled: false } });
+    const { policy } = buildPolicy({ ...DEFAULT_CONFIG, remote: { ...DEFAULT_CONFIG.remote, enabled: false } });
     const release = policy.acquireConcurrency("local");
     expect(typeof release).toBe("function");
     expect(() => policy.acquireConcurrency("local")).not.toThrow();
@@ -89,7 +89,7 @@ describe("SecurityPolicy.acquireConcurrency", () => {
   it("enforces the concurrency cap for remote requests", () => {
     const config: CodeLinkConfig = {
       ...DEFAULT_CONFIG,
-      remote: { enabled: true },
+      remote: { ...DEFAULT_CONFIG.remote, enabled: true },
       rateLimit: { requestsPerMinute: 100, maxConcurrentRequests: 1 },
     };
     const { policy } = buildPolicy(config);

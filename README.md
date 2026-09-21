@@ -24,7 +24,7 @@ External AI / MCP Client
 - **Local-first and safe by default**: the server binds to `127.0.0.1` only, starts stopped, and ships with file delete, terminal access, and Git writes all disabled until you turn them on.
 - **Centralized security**: every tool call passes through path validation, secret-file filtering, and a permission check before it touches your workspace — see [docs/security.md](docs/security.md).
 - **Four security profiles** (`readonly`, `developer`, `trusted`, `custom`) so you can match the permission surface to how much you trust the client on the other end.
-- **Optional remote access** behind bearer-token authentication and rate limiting, plus an optional Cloudflare quick-tunnel — both off until you explicitly enable them.
+- **Optional remote access** behind bearer-token authentication and rate limiting, plus two optional ways to share it — a Cloudflare quick-tunnel, or direct access by IPv6 address and port — all off until you explicitly enable them.
 - **A dashboard and status bar item** for at-a-glance status, and a full set of Command Palette commands.
 
 ## Repository layout
@@ -47,12 +47,16 @@ CodeLink is not yet published to the VS Code Marketplace; install it from a buil
 ```bash
 git clone https://github.com/nishanth-kj/CodeLink
 cd CodeLink
-npm install --prefix extension   # extension/ is a standalone npm project
-npm run build                    # compiles the extension to extension/out
-npm run package                  # produces codelink.vsix in the repo root
+npm run package:local            # installs dependencies, compiles, and writes codelink.vsix to the repo root
 ```
 
-Then in VS Code: **Extensions → ⋯ → Install from VSIX…** and select `codelink.vsix`.
+That creates `codelink.vsix` in the repo root (`CodeLink/codelink.vsix`); the compiled JavaScript goes to `extension/out/`. Then install it, either from a terminal:
+
+```bash
+code --install-extension codelink.vsix --force
+```
+
+or in VS Code via **Extensions → ⋯ → Install from VSIX…** and selecting `codelink.vsix`. Reload the window afterwards.
 
 See [docs/development.md](docs/development.md) for the full development setup, including running the extension from source in the Extension Development Host.
 
@@ -89,7 +93,7 @@ By default, CodeLink is as boring and safe as possible:
 | Git write operations | Not implemented (no tool exists to invoke them) |
 | Secret file access (`.env`, keys, credentials) | Blocked |
 
-Full details, including the path-validation and secret-filtering design, live in [docs/security.md](docs/security.md). Remote access and the optional Cloudflare tunnel are covered in [docs/remote-access.md](docs/remote-access.md) — read that before enabling either.
+Full details, including the path-validation and secret-filtering design, live in [docs/security.md](docs/security.md). Remote access, the optional Cloudflare tunnel, and direct IPv6 access are covered in [docs/remote-access.md](docs/remote-access.md) — read that before enabling any of them.
 
 ## Documentation
 
@@ -98,18 +102,24 @@ Full details, including the path-validation and secret-filtering design, live in
 - [docs/mcp.md](docs/mcp.md) — the MCP server: transport, protocol methods, the tool execution pipeline, error codes.
 - [docs/tools.md](docs/tools.md) — every MCP tool and resource, its inputs, its permission, and its execution layer.
 - [docs/configuration.md](docs/configuration.md) — every `codelink.*` VS Code setting.
-- [docs/remote-access.md](docs/remote-access.md) — authentication, enabling remote access, and the Cloudflare tunnel.
+- [docs/remote-access.md](docs/remote-access.md) — authentication, enabling remote access, the Cloudflare tunnel, and direct IPv6 access.
 - [docs/development.md](docs/development.md) — building, testing, linting, running from source, and packaging.
 
 ## Development
 
 ```bash
 npm install --prefix extension   # extension/ is a standalone npm project, not a workspace
-npm run build               # tsc (extension/)
+npm run build               # tsc (extension/) → extension/out
+npm run build:local         # npm install --prefix extension, then build — one step from a fresh clone
 npm test                    # extension unit/integration tests (vitest)
 npm run lint                # eslint (extension/)
-npm run package             # vsce package → codelink.vsix
+npm run package             # vsce package → codelink.vsix in the repo root
+npm run package:local       # install dependencies, build, and package in one step
+npm run version:set -- X.Y.Z  # change the version: edits .version and syncs every manifest
+npm run version:check       # fail if any manifest's version differs from .version
 ```
+
+The version is defined once, in the root `.version` file — see [Versioning in docs/development.md](docs/development.md#versioning).
 
 The untouched, unused `core/` Rust crate still has its own commands (`npm run build:core`, `npm run test:core`, `npm run lint:core`, `npm run fmt:core`, or `cargo build`/`cargo test`/`cargo fmt`/`cargo clippy` from `core/` directly) if you want to keep working on it, but nothing under `extension/` depends on its output anymore.
 

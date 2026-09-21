@@ -6,6 +6,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { CoreBridge } from "../../extension/src/core/bridge.js";
 import { DEFAULT_CONFIG } from "../../extension/src/config/defaults.js";
+import { mcpUrl } from "../../extension/src/config/network.js";
 import type { CodeLinkConfig } from "../../extension/src/config/schema.js";
 import { McpServerManager, type McpServerAddress } from "../../extension/src/mcp/server.js";
 import { AuthenticationManager, InMemorySecretStore } from "../../extension/src/security/authentication.js";
@@ -77,13 +78,17 @@ async function stopHarness(harness: Harness): Promise<void> {
   fs.rmSync(harness.workspaceRoot, { recursive: true, force: true });
 }
 
-async function connectClient(address: McpServerAddress, token?: string): Promise<Client> {
-  const transport = new StreamableHTTPClientTransport(new URL(`http://${address.host}:${address.port}/mcp`), {
+async function connectToUrl(url: string, token?: string): Promise<Client> {
+  const transport = new StreamableHTTPClientTransport(new URL(url), {
     requestInit: token ? { headers: { Authorization: `Bearer ${token}` } } : undefined,
   });
   const client = new Client({ name: "codelink-integration-test", version: "0.0.0" });
   await client.connect(transport);
   return client;
+}
+
+async function connectClient(address: McpServerAddress, token?: string): Promise<Client> {
+  return connectToUrl(mcpUrl(address.host, address.port), token);
 }
 
 // client.callTool()'s return type is a union: the normal content-bearing
@@ -271,7 +276,7 @@ describe("MCP server remote authentication", () => {
   let harness: Harness;
 
   beforeAll(async () => {
-    harness = await startHarness({ remote: { enabled: true } }, 32173);
+    harness = await startHarness({ remote: { ...DEFAULT_CONFIG.remote, enabled: true } }, 32173);
   });
 
   afterAll(async () => {
@@ -292,6 +297,49 @@ describe("MCP server remote authentication", () => {
     const { tools } = await client.listTools();
     expect(tools.length).toBeGreaterThan(0);
     await client.close();
+  });
+});
+
+const hasIpv6Loopback = Object.values(os.networkInterfaces()).some((entries) =>
+  entries?.some((entry) => entry.address === "::1"),
+);
+
+// Dialling [::1] proves the listener really accepts IPv6 connections by
+// address and port, which is what another machine's [<global-address>]:port
+// URL relies on; the global address itself can't be assumed on a CI runner.
+describe.skipIf(!hasIpv6Loopback)("MCP server direct IPv6 access", () => {
+  let harness: Harness;
+
+  beforeAll(async () => {
+    harness = await startHarness({ remote: { enabled: true, ipv6: true } }, 32175);
+  });
+
+  afterAll(async () => {
+    await stopHarness(harness);
+  });
+
+  it("listens on every IPv6 interface", () => {
+    expect(harness.address.host).toBe("::");
+  });
+
+  it("serves MCP at a bracketed IPv6 URL, and still on IPv4", async () => {
+    const token = await harness.authentication.generateToken();
+    for (const host of ["::1", "127.0.0.1"]) {
+      const client = await connectToUrl(mcpUrl(host, harness.address.port), token);
+      const { tools } = await client.listTools();
+      expect(tools.length).toBeGreaterThan(0);
+      await client.close();
+    }
+  });
+
+  it("still requires the token over IPv6", async () => {
+    await expect(connectToUrl(mcpUrl("::1", harness.address.port))).rejects.toBeTruthy();
+  });
+
+  it("advertises http, not https, in its own URLs when reached by IPv6 address", async () => {
+    const response = await fetch(`http://[::1]:${harness.address.port}/`);
+    const info = (await response.json()) as { mcp_endpoint: string };
+    expect(info.mcp_endpoint).toBe(`http://[::1]:${harness.address.port}/mcp`);
   });
 });
 

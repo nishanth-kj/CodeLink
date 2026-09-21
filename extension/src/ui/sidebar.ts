@@ -1,4 +1,6 @@
 import * as vscode from "vscode";
+import { setRemoteEnabled } from "../commands/remoteAccess.js";
+import { bindsAllIpv6, ipv6Endpoints, localEndpoint } from "../config/network.js";
 import type { AppContext } from "../extension.js";
 import type { PermissionKey } from "../security/permissions.js";
 import { DashboardPanel } from "./dashboard.js";
@@ -61,9 +63,7 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
       const key = permission as PermissionKey;
       const next = this.ctx.permissions.toggle(key);
       if (key === "remoteAccess") {
-        await vscode.workspace
-          .getConfiguration("codelink")
-          .update("remote.enabled", next, vscode.ConfigurationTarget.Workspace);
+        await setRemoteEnabled(this.ctx, next);
       }
       this.refresh();
       DashboardPanel.refreshIfOpen(this.ctx);
@@ -105,6 +105,9 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
       startTunnel: "codelink.startTunnel",
       stopTunnel: "codelink.stopTunnel",
       copyTunnelUrl: "codelink.copyTunnelUrl",
+      enableIpv6: "codelink.enableIpv6Access",
+      disableIpv6: "codelink.disableIpv6Access",
+      copyIpv6Url: "codelink.copyIpv6Url",
       openDashboard: "codelink.openDashboard",
     };
 
@@ -125,8 +128,9 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
     const config = this.ctx.getConfig();
     const running = this.ctx.mcpServer.isRunning();
     const permissions = this.ctx.permissions.snapshot();
-    const host = config.remote.enabled ? config.server.host : "127.0.0.1";
-    const endpoint = running ? `http://${host}:${config.server.port}/mcp` : null;
+    const endpoint = running ? localEndpoint(config) : null;
+    const ipv6On = bindsAllIpv6(config);
+    const ipv6Urls = ipv6On && running ? ipv6Endpoints(config) : [];
     const tunnelRunning = this.ctx.tunnel.isRunning();
     const tunnelUrl = this.ctx.tunnel.getUrl();
     const authRequired = this.ctx.policy.isAuthRequired();
@@ -393,7 +397,7 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
   <!-- MCP Server -->
   <div class="section-title">
     <span>Server</span>
-    <span class="version-tag">v${escapeHtml(this.ctx.version ?? "0.3.2")}</span>
+    <span class="version-tag">v${escapeHtml(this.ctx.version)}</span>
   </div>
   <div class="box">
     <div class="status-line">
@@ -426,6 +430,35 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
       <button data-command="startTunnel">Start Tunnel &amp; Copy URL</button>
     </div>`
       }
+  </div>
+
+  <!-- Direct IPv6 -->
+  <div class="section-title">Direct IPv6</div>
+  <div class="box">
+    <div class="status-line">
+      <span class="indicator ${ipv6On ? "on" : "off"}"></span>
+      <span>${ipv6On ? "Enabled" : "Off"}</span>
+    </div>
+    ${ipv6On
+        ? !running
+          ? `<div class="desc">Start the server to accept IPv6 connections.</div>`
+          : ipv6Urls.length === 0
+            ? `<div class="desc">No IPv6 address that other hosts can reach was found on this machine.</div>`
+            : ipv6Urls
+                .map(
+                  (entry) =>
+                    `<code class="code">${escapeHtml(entry.url)}</code>` +
+                    (entry.scope === "unique-local" ? `<div class="desc">Local network only.</div>` : ""),
+                )
+                .join("")
+        : `<div class="desc">Let others connect straight to this machine's IPv6 address and port, no tunnel needed.</div>`
+      }
+    <div class="btn-row">
+      ${ipv6On
+        ? `${ipv6Urls.length > 0 ? `<button data-command="copyIpv6Url">Copy URL</button>` : ""}<button class="secondary" data-command="disableIpv6">Disable</button>`
+        : `<button data-command="enableIpv6">Enable Direct IPv6</button>`
+      }
+    </div>
   </div>
 
   <!-- Authentication -->

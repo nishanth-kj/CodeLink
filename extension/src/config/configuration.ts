@@ -34,6 +34,7 @@ export function loadConfig(): CodeLinkConfig {
     },
     remote: {
       enabled: read(c, "remote.enabled", DEFAULT_CONFIG.remote.enabled),
+      ipv6: read(c, "remote.ipv6", DEFAULT_CONFIG.remote.ipv6),
     },
     files: {
       excludePatterns: read(c, "files.excludePatterns", DEFAULT_CONFIG.files.excludePatterns),

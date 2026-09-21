@@ -1,15 +1,20 @@
 {
   "name": "codelink-mcp",
   "private": true,
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "CodeLink turns a local VS Code workspace into a secure Model Context Protocol (MCP) server for external AI agents.",
   "license": "MIT",
   "type": "module",
   "scripts": {
     "build": "npm --prefix extension run build",
+    "build:local": "npm install --prefix extension && npm run build",
+    "package:local": "npm run build:local && npm run package",
     "build:core": "cargo build --release --manifest-path core/Cargo.toml",
     "watch": "npm --prefix extension run watch",
-    "test": "npm run typecheck:tests && npm run test:extension",
+    "version:check": "node scripts/version.mjs check",
+    "version:sync": "node scripts/version.mjs sync",
+    "version:set": "node scripts/version.mjs set",
+    "test": "npm run version:check && npm run typecheck:tests && npm run test:extension",
     "test:extension": "npm --prefix extension run test",
     "test:core": "cargo test --manifest-path core/Cargo.toml",
     "typecheck:tests": "node scripts/link-test-node-modules.mjs && node extension/node_modules/typescript/bin/tsc -p tests/tsconfig.json --noEmit",
@@ -17,6 +22,7 @@
     "lint:core": "cargo clippy --manifest-path core/Cargo.toml --all-targets -- -D warnings",
     "fmt:core": "cargo fmt --manifest-path core/Cargo.toml",
     "fmt:core:check": "cargo fmt --manifest-path core/Cargo.toml -- --check",
+    "prepackage": "npm run version:check",
     "package": "npm --prefix extension run package"
   },
   "devDependencies": {}

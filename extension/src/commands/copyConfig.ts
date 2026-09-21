@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { clientEndpoint } from "../config/network.js";
 import type { AppContext } from "../extension.js";
 import { showInfo } from "../ui/notifications.js";
 
@@ -7,8 +8,7 @@ import { showInfo } from "../ui/notifications.js";
  * their own generated token in, and is told exactly where to put it. */
 export async function copyConfig(ctx: AppContext): Promise<void> {
   const config = ctx.getConfig();
-  const host = config.remote.enabled ? config.server.host : "127.0.0.1";
-  const url = `http://${host}:${config.server.port}/mcp`;
+  const url = clientEndpoint(config);
   const hasToken = await ctx.authentication.hasToken();
   const needsAuth = config.remote.enabled && hasToken;
 

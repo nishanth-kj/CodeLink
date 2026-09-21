@@ -2,7 +2,7 @@
   "name": "codelink-mcp",
   "displayName": "CodeLink MCP",
   "description": "Turn your VS Code workspace into a secure local MCP server for external AI agents.",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "icon": "media/icon.png",
   "publisher": "nishanth-kj",
   "license": "MIT",
@@ -35,6 +35,9 @@
       { "command": "codelink.stopTunnel", "title": "Stop Cloudflare Tunnel", "category": "CodeLink" },
       { "command": "codelink.showTunnelUrl", "title": "Show Tunnel URL", "category": "CodeLink" },
       { "command": "codelink.copyTunnelUrl", "title": "Copy Tunnel URL", "category": "CodeLink" },
+      { "command": "codelink.enableIpv6Access", "title": "Enable Direct IPv6 Access", "category": "CodeLink" },
+      { "command": "codelink.disableIpv6Access", "title": "Disable Direct IPv6 Access", "category": "CodeLink" },
+      { "command": "codelink.copyIpv6Url", "title": "Copy IPv6 Endpoint URL", "category": "CodeLink" },
       { "command": "codelink.openDashboard", "title": "Open Dashboard", "category": "CodeLink" }
     ],
     "configuration": {
@@ -109,6 +112,11 @@
           "type": "boolean",
           "default": false,
           "description": "Allow the MCP server to bind to a non-loopback host and accept authenticated remote connections. Disabled by default."
+        },
+        "codelink.remote.ipv6": {
+          "type": "boolean",
+          "default": false,
+          "description": "Listen on every IPv6 interface (::, which also accepts IPv4) so other machines can connect directly to http://[your-ipv6-address]:<port>/mcp without a tunnel. Only takes effect while codelink.remote.enabled is true; prefer the 'CodeLink: Enable Direct IPv6 Access' command, which asks for confirmation first."
         },
         "codelink.security.allowSecretFileAccess": {
           "type": "boolean",
