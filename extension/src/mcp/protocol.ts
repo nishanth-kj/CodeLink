@@ -1,6 +1,22 @@
+import { isIP } from "node:net";
 import { ErrorCodes } from "../utils/errors.js";
 
 export const MCP_ENDPOINT_PATH = "/mcp";
+
+/**
+ * Scheme to assume when rebuilding this server's own URL from a request's
+ * `Host` header (for the root info page and OAuth discovery documents) and
+ * no `X-Forwarded-Proto` says otherwise. The listener itself is plain HTTP,
+ * so a client that dialled localhost or a bare IP address — IPv4, or a
+ * bracketed IPv6 literal such as `[2001:db8::1]:32100` — is on `http`; only
+ * a named host can be a TLS-terminating tunnel or proxy.
+ */
+export function defaultProtocolForHost(hostHeader: string): "http" | "https" {
+  const hostname = hostHeader.startsWith("[")
+    ? hostHeader.slice(1, hostHeader.indexOf("]"))
+    : (hostHeader.split(":")[0] ?? hostHeader);
+  return hostname.toLowerCase() === "localhost" || isIP(hostname) !== 0 ? "http" : "https";
+}
 
 /** Maps a CodeLink error code to the HTTP status a client should see when
  * the failure happens before the MCP JSON-RPC layer gets involved (i.e.

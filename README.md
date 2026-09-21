@@ -24,7 +24,7 @@ External AI / MCP Client
 - **Local-first and safe by default**: the server binds to `127.0.0.1` only, starts stopped, and ships with file delete, terminal access, and Git writes all disabled until you turn them on.
 - **Centralized security**: every tool call passes through path validation, secret-file filtering, and a permission check before it touches your workspace — see [docs/security.md](docs/security.md).
 - **Four security profiles** (`readonly`, `developer`, `trusted`, `custom`) so you can match the permission surface to how much you trust the client on the other end.
-- **Optional remote access** behind bearer-token authentication and rate limiting, plus an optional Cloudflare quick-tunnel — both off until you explicitly enable them.
+- **Optional remote access** behind bearer-token authentication and rate limiting, plus two optional ways to share it — a Cloudflare quick-tunnel, or direct access by IPv6 address and port — all off until you explicitly enable them.
 - **A dashboard and status bar item** for at-a-glance status, and a full set of Command Palette commands.
 
 ## Repository layout
@@ -89,7 +89,7 @@ By default, CodeLink is as boring and safe as possible:
 | Git write operations | Not implemented (no tool exists to invoke them) |
 | Secret file access (`.env`, keys, credentials) | Blocked |
 
-Full details, including the path-validation and secret-filtering design, live in [docs/security.md](docs/security.md). Remote access and the optional Cloudflare tunnel are covered in [docs/remote-access.md](docs/remote-access.md) — read that before enabling either.
+Full details, including the path-validation and secret-filtering design, live in [docs/security.md](docs/security.md). Remote access, the optional Cloudflare tunnel, and direct IPv6 access are covered in [docs/remote-access.md](docs/remote-access.md) — read that before enabling any of them.
 
 ## Documentation
 
@@ -98,7 +98,7 @@ Full details, including the path-validation and secret-filtering design, live in
 - [docs/mcp.md](docs/mcp.md) — the MCP server: transport, protocol methods, the tool execution pipeline, error codes.
 - [docs/tools.md](docs/tools.md) — every MCP tool and resource, its inputs, its permission, and its execution layer.
 - [docs/configuration.md](docs/configuration.md) — every `codelink.*` VS Code setting.
-- [docs/remote-access.md](docs/remote-access.md) — authentication, enabling remote access, and the Cloudflare tunnel.
+- [docs/remote-access.md](docs/remote-access.md) — authentication, enabling remote access, the Cloudflare tunnel, and direct IPv6 access.
 - [docs/development.md](docs/development.md) — building, testing, linting, running from source, and packaging.
 
 ## Development

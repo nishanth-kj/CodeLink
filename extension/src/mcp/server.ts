@@ -23,7 +23,13 @@ import { CodeLinkError, ErrorCodes } from "../utils/errors.js";
 import type { Logger } from "../utils/logger.js";
 import { OAuthServer } from "../security/oauth.js";
 import { buildServerInfo, SERVER_INSTRUCTIONS } from "./capabilities.js";
-import { extractBearerToken, httpStatusForErrorCode, isHostHeaderAllowed, MCP_ENDPOINT_PATH } from "./protocol.js";
+import {
+  defaultProtocolForHost,
+  extractBearerToken,
+  httpStatusForErrorCode,
+  isHostHeaderAllowed,
+  MCP_ENDPOINT_PATH,
+} from "./protocol.js";
 import { SessionTracker } from "./session.js";
 
 const ALL_TOOLS: RegisteredTool[] = [
@@ -144,6 +150,13 @@ export class McpServerManager {
         httpServer.removeListener("listening", onListening);
         if (error.code === "EADDRINUSE") {
           reject(new CodeLinkError(ErrorCodes.PORT_IN_USE, `Port ${port} is already in use.`));
+        } else if ((error.code === "EAFNOSUPPORT" || error.code === "EADDRNOTAVAIL") && host.includes(":")) {
+          reject(
+            new CodeLinkError(
+              ErrorCodes.SERVER_START_FAILED,
+              `Cannot listen on IPv6 address ${host}: IPv6 is not available on this machine (${error.code}).`,
+            ),
+          );
         } else {
           reject(new CodeLinkError(ErrorCodes.SERVER_START_FAILED, error.message));
         }
@@ -238,8 +251,7 @@ export class McpServerManager {
   private async handleRequest(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
     const config = this.options.getConfig();
     const hostHeader = req.headers.host ?? "localhost";
-    const defaultProto = hostHeader.startsWith("localhost") || hostHeader.startsWith("127.0.0.1") ? "http" : "https";
-    const proto = (req.headers["x-forwarded-proto"] as string) ?? defaultProto;
+    const proto = (req.headers["x-forwarded-proto"] as string) ?? defaultProtocolForHost(hostHeader);
     const hostUrl = `${proto}://${hostHeader}`;
     const url = new URL(req.url ?? "/", hostUrl);
 

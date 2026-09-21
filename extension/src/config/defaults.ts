@@ -25,6 +25,7 @@ export const DEFAULT_CONFIG: CodeLinkConfig = {
   },
   remote: {
     enabled: false,
+    ipv6: false,
   },
   files: {
     excludePatterns: [
@@ -62,7 +63,11 @@ export const DEFAULT_CONFIG: CodeLinkConfig = {
 
 /** Always-on invariant: CodeLink never binds to a non-loopback host unless
  * remote access has been explicitly enabled, regardless of what a user (or a
- * misconfigured settings.json) puts in `codelink.server.host`. */
+ * misconfigured settings.json) puts in `codelink.server.host` or
+ * `codelink.remote.ipv6`. `::` is dual-stack, so it also accepts IPv4. */
 export function effectiveHost(config: CodeLinkConfig): string {
-  return config.remote.enabled ? config.server.host : "127.0.0.1";
+  if (!config.remote.enabled) {
+    return "127.0.0.1";
+  }
+  return config.remote.ipv6 ? "::" : config.server.host;
 }

@@ -15,6 +15,12 @@ cd CodeLink
 npm install --prefix extension   # extension/ is a standalone npm project, not a workspace
 ```
 
+Or, to install dependencies and compile in one step from the repo root:
+
+```bash
+npm run build:local              # npm install --prefix extension, then tsc → extension/out
+```
+
 ## Running from source
 
 Open the repository root in VS Code and use the **Run CodeLink Extension** launch configuration (`.vscode/launch.json`), which runs `extension: watch` (`tsc -w`) first and launches an Extension Development Host with this repo (or any folder you open in that host) as the workspace. The "CodeLink is installed…" first-run notice appears once; the server itself stays stopped until you run **CodeLink: Start MCP Server**.
@@ -70,7 +76,9 @@ npm run build     # tsc (from the repo root; delegates to extension/)
 npm run package   # vsce package -o codelink.vsix (from the repo root; delegates to extension/)
 ```
 
-This produces `codelink.vsix` (a few MB — `extension/`'s compiled output, `LICENSE`, `README.md`, and its production `node_modules`; no `--no-dependencies` flag, since `@modelcontextprotocol/sdk` and `zod` are real runtime dependencies, not bundled via esbuild). The extension has no native binary to bundle: the local core is plain TypeScript compiled alongside everything else, so the same `.vsix` runs unmodified on every platform VS Code supports.
+Or, from a fresh clone, `npm run package:local` installs dependencies, compiles, and packages in one step.
+
+This produces `codelink.vsix` in the repo root (a few MB — `extension/`'s compiled output, `LICENSE`, `README.md`, and its production `node_modules`; no `--no-dependencies` flag, since `@modelcontextprotocol/sdk` and `zod` are real runtime dependencies, not bundled via esbuild). The extension has no native binary to bundle: the local core is plain TypeScript compiled alongside everything else, so the same `.vsix` runs unmodified on every platform VS Code supports.
 
 **`extension/` is a standalone npm project, not an npm workspace**, specifically because of how `vsce package` discovers files: it runs `npm list --production --parseable --depth=99999` from the package directory to find dependency folders to include, and in a workspaces monorepo that walk resolves the workspace root itself as a "dependency" — which made `vsce` try to glob the *entire repository* into the VSIX, and then fail outright on a path that climbed outside the accepted package root. If you're tempted to reintroduce `"workspaces": ["extension"]` in the root `package.json` for convenience, check that `vsce package` still produces a small, sane VSIX afterward (`vsce ls --tree` from `extension/` shows exactly what would be included).
 

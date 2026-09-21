@@ -7,6 +7,8 @@
   "type": "module",
   "scripts": {
     "build": "npm --prefix extension run build",
+    "build:local": "npm install --prefix extension && npm run build",
+    "package:local": "npm run build:local && npm run package",
     "build:core": "cargo build --release --manifest-path core/Cargo.toml",
     "watch": "npm --prefix extension run watch",
     "test": "npm run typecheck:tests && npm run test:extension",

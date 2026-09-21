@@ -69,12 +69,12 @@ describe("PermissionManager", () => {
 
   it("remoteAccess always mirrors codelink.remote.enabled regardless of profile", () => {
     const trustedNoRemote = new PermissionManager(() =>
-      configWith({ security: { ...DEFAULT_CONFIG.security, profile: "trusted" }, remote: { enabled: false } }),
+      configWith({ security: { ...DEFAULT_CONFIG.security, profile: "trusted" }, remote: { ...DEFAULT_CONFIG.remote, enabled: false } }),
     );
     expect(trustedNoRemote.check("remoteAccess").allowed).toBe(false);
 
     const readonlyWithRemote = new PermissionManager(() =>
-      configWith({ security: { ...DEFAULT_CONFIG.security, profile: "readonly" }, remote: { enabled: true } }),
+      configWith({ security: { ...DEFAULT_CONFIG.security, profile: "readonly" }, remote: { ...DEFAULT_CONFIG.remote, enabled: true } }),
     );
     expect(readonlyWithRemote.check("remoteAccess").allowed).toBe(true);
   });

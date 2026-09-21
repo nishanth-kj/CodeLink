@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { copyConfig } from "./commands/copyConfig.js";
 import { generateToken } from "./commands/generateToken.js";
+import { copyIpv6Url, disableIpv6Access, enableIpv6Access } from "./commands/ipv6Access.js";
 import { openDashboard } from "./commands/openDashboard.js";
 import { disableRemoteAccess, enableRemoteAccess } from "./commands/remoteAccess.js";
 import { restartServer } from "./commands/restartServer.js";
@@ -180,6 +181,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   register("codelink.stopTunnel", () => stopTunnel(ctx));
   register("codelink.showTunnelUrl", () => showTunnelUrl(ctx));
   register("codelink.copyTunnelUrl", () => copyTunnelUrl(ctx));
+  register("codelink.enableIpv6Access", () => enableIpv6Access(ctx));
+  register("codelink.disableIpv6Access", () => disableIpv6Access(ctx));
+  register("codelink.copyIpv6Url", () => copyIpv6Url(ctx));
   register("codelink.openDashboard", () => openDashboard(ctx));
 
   await maybeShowFirstRunNotification(context);
